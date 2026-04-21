@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { mockSongs, liturgicalTagLabels, getDefaultVersion } from '@/data/mock-songs';
+import { useSongs } from '@/hooks/useData';
+import { liturgicalTagLabels } from '@/data/mock-songs';
 import SongCard from '@/components/SongCard';
 import type { LiturgicalTag, SongNature } from '@/types';
 import {
@@ -11,6 +12,7 @@ import {
   Library,
   Tag,
   Music2,
+  Loader2,
 } from 'lucide-react';
 
 const allTags: LiturgicalTag[] = [
@@ -19,13 +21,14 @@ const allTags: LiturgicalTag[] = [
 ];
 
 export default function MusicasPage() {
+  const { songs, loading } = useSongs();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedNature, setSelectedNature] = useState<SongNature | 'all'>('all');
   const [selectedTag, setSelectedTag] = useState<LiturgicalTag | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
   const filteredSongs = useMemo(() => {
-    return mockSongs.filter((song) => {
+    return songs.filter((song) => {
       // Text search (title, artists, lyrics)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -50,7 +53,15 @@ export default function MusicasPage() {
 
       return true;
     });
-  }, [searchQuery, selectedNature, selectedTag]);
+  }, [songs, searchQuery, selectedNature, selectedTag]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-accent animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -62,7 +73,7 @@ export default function MusicasPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-foreground tracking-tight">Todas as Músicas</h1>
-            <p className="text-xs text-muted">{mockSongs.length} músicas no acervo</p>
+            <p className="text-xs text-muted">{songs.length} músicas no acervo</p>
           </div>
         </div>
 

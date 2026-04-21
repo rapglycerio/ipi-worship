@@ -1,10 +1,10 @@
 'use client';
 
-import { use, useState } from 'react';
-import { mockSongs, getDefaultVersion, liturgicalTagLabels } from '@/data/mock-songs';
+import { use, useState, useEffect } from 'react';
+import { liturgicalTagLabels } from '@/data/mock-songs';
 import ChordBlockView, { ChordToolbar } from '@/components/ChordBlockView';
 import { useWakeLock } from '@/hooks/useWakeLock';
-import type { ViewMode, FontSizePreset, SongVersion } from '@/types';
+import type { MasterSong, ViewMode, FontSizePreset, SongVersion } from '@/types';
 import {
   ArrowLeft,
   ExternalLink,
@@ -19,12 +19,13 @@ import {
   PlayCircle,
   Music2,
   MonitorSmartphone,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SongPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const song = mockSongs.find((s) => s.id === id);
+  const [song, setSong] = useState<MasterSong | null | undefined>(undefined); // undefined = loading
 
   const [viewMode, setViewMode] = useState<ViewMode>('chords_and_lyrics');
   const [fontSize, setFontSize] = useState<FontSizePreset>('md');
@@ -33,6 +34,36 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
   const { isActive: wakeLockActive, isSupported: wakeLockSupported, toggle: toggleWakeLock } = useWakeLock();
+
+  useEffect(() => {
+    async function loadSong() {
+      try {
+        const { fetchSongById } = await import('@/lib/data');
+        const dbSong = await fetchSongById(id);
+        if (dbSong) {
+          setSong(dbSong);
+        } else {
+          // Fallback: try mock data
+          const { mockSongs } = await import('@/data/mock-songs');
+          setSong(mockSongs.find((s) => s.id === id) || null);
+        }
+      } catch {
+        // Offline fallback
+        const { mockSongs } = await import('@/data/mock-songs');
+        setSong(mockSongs.find((s) => s.id === id) || null);
+      }
+    }
+    loadSong();
+  }, [id]);
+
+  // Loading state
+  if (song === undefined) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 text-accent animate-spin" />
+      </div>
+    );
+  }
 
   if (!song) {
     return (
@@ -48,7 +79,7 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
     );
   }
 
-  const defaultVersion = getDefaultVersion(song);
+  const defaultVersion = song.versions.find((v) => v.isDefault) || song.versions[0];
   const activeVersion = selectedVersionId
     ? song.versions.find((v) => v.id === selectedVersionId) || defaultVersion
     : defaultVersion;

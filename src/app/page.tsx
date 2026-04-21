@@ -1,6 +1,7 @@
 'use client';
 
-import { mockSongs, mockPlaylist, liturgicalTagLabels } from '@/data/mock-songs';
+import { useSongs, usePlaylists } from '@/hooks/useData';
+import { liturgicalTagLabels } from '@/data/mock-songs';
 import SongCard from '@/components/SongCard';
 import {
   CalendarDays,
@@ -9,16 +10,36 @@ import {
   Music2,
   Library,
   ChevronRight,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Home() {
-  const playlistSongs = mockPlaylist.arrangements.map((arr) => {
-    return mockSongs.find((s) => s.id === arr.masterSongId)!;
-  }).filter(Boolean);
+  const { songs, loading: songsLoading } = useSongs();
+  const { playlists, loading: playlistsLoading } = usePlaylists();
 
-  const approvedCount = mockSongs.filter((s) => s.analysis?.status === 'approved').length;
-  const totalCount = mockSongs.length;
+  const loading = songsLoading || playlistsLoading;
+  const playlist = playlists[0]; // Latest playlist
+
+  const playlistSongs = playlist
+    ? playlist.arrangements
+        .map((arr) => songs.find((s) => s.id === arr.masterSongId)!)
+        .filter(Boolean)
+    : [];
+
+  const approvedCount = songs.filter((s) => s.analysis?.status === 'approved').length;
+  const totalCount = songs.length;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-accent animate-spin mx-auto mb-3" />
+          <p className="text-sm text-muted">Carregando repertório...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -44,33 +65,35 @@ export default function Home() {
       </section>
 
       {/* Playlist Header */}
-      <section className="px-5 md:px-8">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
-              <CalendarDays className="w-5 h-5 text-accent" />
+      {playlist && (
+        <section className="px-5 md:px-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+                <CalendarDays className="w-5 h-5 text-accent" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-foreground">{playlist.name}</h2>
+                <p className="text-xs text-muted capitalize">
+                  Culto {playlist.serviceType === 'manha' ? 'da Manhã' : playlist.serviceType === 'noite' ? 'da Noite' : playlist.serviceType}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base font-bold text-foreground">{mockPlaylist.name}</h2>
-              <p className="text-xs text-muted capitalize">
-                Culto {mockPlaylist.serviceType === 'manha' ? 'da Manhã' : mockPlaylist.serviceType === 'noite' ? 'da Noite' : mockPlaylist.serviceType}
-              </p>
-            </div>
+            <span className="text-xs font-mono text-subtle bg-elevated px-2.5 py-1 rounded-md">
+              {playlistSongs.length} músicas
+            </span>
           </div>
-          <span className="text-xs font-mono text-subtle bg-elevated px-2.5 py-1 rounded-md">
-            {playlistSongs.length} músicas
-          </span>
-        </div>
 
-        {/* Songs List */}
-        <div className="space-y-2 mb-8">
-          {playlistSongs.map((song, i) => (
-            <div key={song.id} className="animate-slide-up" style={{ animationDelay: `${i * 80}ms` }}>
-              <SongCard song={song} index={i} />
-            </div>
-          ))}
-        </div>
-      </section>
+          {/* Songs List */}
+          <div className="space-y-2 mb-8">
+            {playlistSongs.map((song, i) => (
+              <div key={song.id} className="animate-slide-up" style={{ animationDelay: `${i * 80}ms` }}>
+                <SongCard song={song} index={i} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Quick Stats */}
       <section className="px-5 md:px-8 mb-8">
@@ -92,12 +115,12 @@ export default function Home() {
           <StatCard
             icon={ListMusic}
             label="Playlists"
-            value="1"
+            value={playlists.length.toString()}
           />
           <StatCard
             icon={Music2}
             label="Artistas"
-            value={new Set(mockSongs.flatMap(s => s.versions.flatMap(v => v.artists))).size.toString()}
+            value={new Set(songs.flatMap(s => s.versions.flatMap(v => v.artists))).size.toString()}
           />
         </div>
       </section>
@@ -117,7 +140,7 @@ export default function Home() {
           </Link>
         </div>
         <div className="space-y-2">
-          {mockSongs.map((song, i) => (
+          {songs.map((song, i) => (
             <div key={song.id} className="animate-slide-up" style={{ animationDelay: `${(playlistSongs.length + i) * 60}ms` }}>
               <SongCard song={song} compact />
             </div>

@@ -54,6 +54,8 @@ export default function ImportarPage() {
   const [fontSize, setFontSize] = useState<FontSizePreset>('md');
   const [transpose, setTranspose] = useState(0);
 
+  const [saving, setSaving] = useState(false);
+
   const handleParse = () => {
     if (!rawText.trim()) return;
     const result = parseCifra(rawText);
@@ -68,11 +70,65 @@ export default function ImportarPage() {
   };
 
   const handleSave = async () => {
-    if (!parseResult || !title.trim()) return;
+    if (!parseResult || !title.trim() || saving) return;
 
-    // TODO: Replace with actual Supabase insert via data.ts
-    // For now, just show success state
-    setStep('saved');
+    setSaving(true);
+    try {
+      const { insertSong } = await import('@/lib/data');
+
+      // Build searchable lyrics from all block lines
+      const searchableLyrics = parseResult.blocks
+        .flatMap((b) => b.lines.map((l) => l.lyrics))
+        .filter(Boolean)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const songId = await insertSong({
+        title: title.trim(),
+        originalComposer: undefined,
+        nature,
+        liturgicalTags: selectedTags,
+        analysis: {
+          id: '',
+          status: 'pending' as const,
+          justification: '',
+          analyzedBy: '',
+          analyzedAt: '',
+          scriptureReferences: [],
+        },
+        versions: [
+          {
+            id: '',
+            masterSongId: '',
+            artists: artists
+              .split(',')
+              .map((a) => a.trim())
+              .filter(Boolean),
+            key: (key || parseResult.detectedKey || 'C') as import('@/types').MusicalKey,
+            bpm: parseInt(bpm) || 0,
+            blocks: parseResult.blocks,
+            youtubeUrl: youtubeUrl || undefined,
+            sourceUrl: cifraUrl || undefined,
+            isDefault: true,
+            createdAt: '',
+            updatedAt: '',
+          },
+        ],
+        searchableLyrics,
+      });
+
+      if (songId) {
+        setStep('saved');
+      } else {
+        alert('Erro ao salvar. Tente novamente.');
+      }
+    } catch (err) {
+      console.error('Save error:', err);
+      alert('Erro ao salvar. Verifique a conexão.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleTag = (tag: LiturgicalTag) => {
@@ -350,11 +406,20 @@ export default function ImportarPage() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={!title.trim()}
+                disabled={!title.trim() || saving}
                 className="flex-1 py-3 rounded-xl bg-success text-white font-semibold text-sm hover:bg-success/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                <Save className="w-4 h-4" />
-                Salvar Música
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Salvar Música
+                  </>
+                )}
               </button>
             </div>
           </div>
