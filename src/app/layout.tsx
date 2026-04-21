@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
+import AuthProvider from "@/components/AuthProvider";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -34,11 +35,13 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className="min-h-full flex">
-        <Sidebar />
-        {/* Main Content */}
-        <main className="flex-1 md:ml-[280px] pt-14 md:pt-0 min-h-screen">
-          {children}
-        </main>
+        <AuthProvider>
+          <Sidebar />
+          {/* Main Content */}
+          <main className="flex-1 md:ml-[280px] pt-14 md:pt-0 min-h-screen">
+            {children}
+          </main>
+        </AuthProvider>
       </body>
     </html>
   );

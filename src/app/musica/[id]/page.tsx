@@ -3,6 +3,7 @@
 import { use, useState } from 'react';
 import { mockSongs, getDefaultVersion, liturgicalTagLabels } from '@/data/mock-songs';
 import ChordBlockView, { ChordToolbar } from '@/components/ChordBlockView';
+import { useWakeLock } from '@/hooks/useWakeLock';
 import type { ViewMode, FontSizePreset, SongVersion } from '@/types';
 import {
   ArrowLeft,
@@ -17,6 +18,7 @@ import {
   BookOpen,
   PlayCircle,
   Music2,
+  MonitorSmartphone,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -30,6 +32,7 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
+  const { isActive: wakeLockActive, isSupported: wakeLockSupported, toggle: toggleWakeLock } = useWakeLock();
 
   if (!song) {
     return (
@@ -243,6 +246,23 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
             Assistir no YouTube
             <ExternalLink className="w-3 h-3" />
           </a>
+        )}
+        {/* Wake Lock Toggle */}
+        {wakeLockSupported && (
+          <button
+            onClick={toggleWakeLock}
+            className={`
+              mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium
+              transition-all cursor-pointer ml-2
+              ${wakeLockActive
+                ? 'bg-accent/10 text-accent border border-accent/30'
+                : 'bg-elevated text-muted hover:bg-border'
+              }
+            `}
+          >
+            <MonitorSmartphone className="w-4 h-4" />
+            {wakeLockActive ? 'Tela Ligada ✓' : 'Manter Tela Ligada'}
+          </button>
         )}
       </div>
 

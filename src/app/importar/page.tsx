@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { parseCifra, extractFromCifraClubHtml, type ParseResult } from '@/lib/cifra-parser';
-import { ChordBlockView, ChordToolbar } from '@/components/ChordBlockView';
+import ChordBlockView, { ChordToolbar } from '@/components/ChordBlockView';
 import type { ChordBlock, SongVersion, MusicalKey, ViewMode, FontSizePreset, SongNature, LiturgicalTag, ApprovalStatus } from '@/types';
 import {
   Upload,
@@ -200,8 +200,10 @@ export default function ImportarPage() {
 
             {/* Toolbar */}
             <ChordToolbar
+              songTitle={parseResult.rawTitle || 'Preview'}
               currentKey={parseResult.detectedKey || 'C'}
-              transpose={transpose}
+              bpm={72}
+              transposeSemitones={transpose}
               onTransposeChange={setTranspose}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
@@ -215,7 +217,7 @@ export default function ImportarPage() {
                 <ChordBlockView
                   key={block.id}
                   block={block}
-                  transpose={transpose}
+                  transposeSemitones={transpose}
                   viewMode={viewMode}
                   fontSize={fontSize}
                 />
