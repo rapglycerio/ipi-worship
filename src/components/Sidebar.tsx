@@ -14,6 +14,7 @@ import {
   Sun,
   ClipboardCheck,
   Library,
+  Upload,
 } from 'lucide-react';
 
 const navItems = [
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/artistas', label: 'Artistas', icon: Users },
   { href: '/playlists', label: 'Playlists', icon: Music },
   { href: '/analises', label: 'Análises de Louvor', icon: ClipboardCheck },
+  { href: '/importar', label: 'Importar Cifra', icon: Upload },
 ];
 
 export default function Sidebar() {
