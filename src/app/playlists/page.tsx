@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { usePlaylists, useSongs } from '@/hooks/useData';
-import { useSession } from 'next-auth/react';
 import {
   DndContext,
   closestCenter,
@@ -59,7 +58,6 @@ interface PlaylistFormData {
 export default function PlaylistsPage() {
   const { playlists, loading, refetch } = usePlaylists();
   const { songs } = useSongs();
-  const { data: session } = useSession();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -93,7 +91,6 @@ export default function PlaylistsPage() {
           name: data.name,
           serviceType: data.serviceType,
           serviceDate: data.serviceDate,
-          createdBy: session?.user?.name ?? 'Usuário',
         });
       }
       await refetch();

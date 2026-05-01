@@ -204,7 +204,6 @@ export async function createPlaylist(data: {
   name: string;
   serviceType: string;
   serviceDate: string;
-  createdBy: string;
 }): Promise<string | null> {
   const { data: result, error } = await supabase
     .from('playlists')
@@ -212,7 +211,7 @@ export async function createPlaylist(data: {
       name: data.name,
       service_type: data.serviceType,
       service_date: data.serviceDate,
-      created_by: data.createdBy,
+      // created_by é UUID FK para auth.users — deixamos null (NextAuth não usa Supabase Auth)
     })
     .select('id')
     .single();
@@ -438,7 +437,7 @@ function mapDbPlaylistToPlaylist(row: any): Playlist {
         transposedKey: a.transposed_key || undefined,
         createdAt: a.created_at,
       })),
-    createdBy: row.created_by || 'Sistema',
+    createdBy: 'Equipe', // created_by no DB é UUID FK para auth.users; exibe nome genérico
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
