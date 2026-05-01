@@ -198,6 +198,178 @@ export async function fetchPlaylistById(id: string): Promise<Playlist | null> {
   return mapDbPlaylistToPlaylist(data);
 }
 
+// === PLAYLIST CRUD ===
+
+export async function createPlaylist(data: {
+  name: string;
+  serviceType: string;
+  serviceDate: string;
+  createdBy: string;
+}): Promise<string | null> {
+  const { data: result, error } = await supabase
+    .from('playlists')
+    .insert({
+      name: data.name,
+      service_type: data.serviceType,
+      service_date: data.serviceDate,
+      created_by: data.createdBy,
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('Error creating playlist:', error);
+    return null;
+  }
+  return result.id;
+}
+
+export async function updatePlaylist(
+  id: string,
+  data: { name?: string; serviceType?: string; serviceDate?: string }
+): Promise<boolean> {
+  const patch: Record<string, string> = {};
+  if (data.name !== undefined) patch.name = data.name;
+  if (data.serviceType !== undefined) patch.service_type = data.serviceType;
+  if (data.serviceDate !== undefined) patch.service_date = data.serviceDate;
+
+  const { error } = await supabase.from('playlists').update(patch).eq('id', id);
+  if (error) {
+    console.error('Error updating playlist:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function deletePlaylist(id: string): Promise<boolean> {
+  const { error } = await supabase.from('playlists').delete().eq('id', id);
+  if (error) {
+    console.error('Error deleting playlist:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function addSongToPlaylist(data: {
+  playlistId: string;
+  masterSongId: string;
+  versionId: string;
+  sortOrder: number;
+}): Promise<string | null> {
+  const { data: result, error } = await supabase
+    .from('worship_arrangements')
+    .insert({
+      playlist_id: data.playlistId,
+      master_song_id: data.masterSongId,
+      version_id: data.versionId,
+      sort_order: data.sortOrder,
+      block_order: [],
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('Error adding song to playlist:', error);
+    return null;
+  }
+  return result.id;
+}
+
+export async function removeArrangementFromPlaylist(arrangementId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('worship_arrangements')
+    .delete()
+    .eq('id', arrangementId);
+  if (error) {
+    console.error('Error removing arrangement:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function updateArrangementOrders(
+  updates: { id: string; sortOrder: number }[]
+): Promise<boolean> {
+  const results = await Promise.all(
+    updates.map(({ id, sortOrder }) =>
+      supabase.from('worship_arrangements').update({ sort_order: sortOrder }).eq('id', id)
+    )
+  );
+  return results.every(({ error }) => !error);
+}
+
+// === SONG CRUD ===
+
+export async function deleteSong(id: string): Promise<boolean> {
+  const { error } = await supabase.from('master_songs').delete().eq('id', id);
+  if (error) {
+    console.error('Error deleting song:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function updateSongMetadata(
+  id: string,
+  data: {
+    title?: string;
+    originalComposer?: string;
+    nature?: string;
+    liturgicalTags?: LiturgicalTag[];
+  }
+): Promise<boolean> {
+  const patch: Record<string, string | null> = {};
+  if (data.title !== undefined) patch.title = data.title;
+  if (data.originalComposer !== undefined) patch.original_composer = data.originalComposer || null;
+  if (data.nature !== undefined) patch.nature = data.nature;
+
+  if (Object.keys(patch).length > 0) {
+    const { error } = await supabase.from('master_songs').update(patch).eq('id', id);
+    if (error) {
+      console.error('Error updating song:', error);
+      return false;
+    }
+  }
+
+  if (data.liturgicalTags !== undefined) {
+    await supabase.from('song_liturgical_tags').delete().eq('song_id', id);
+    if (data.liturgicalTags.length > 0) {
+      await supabase.from('song_liturgical_tags').insert(
+        data.liturgicalTags.map((tag) => ({ song_id: id, tag_id: tag }))
+      );
+    }
+  }
+
+  return true;
+}
+
+// === AUTH HELPERS ===
+
+export async function getUserRole(email: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('role')
+    .eq('email', email)
+    .single();
+  if (error || !data) return null;
+  return data.role;
+}
+
+export async function upsertAppUser(user: {
+  email: string;
+  displayName: string;
+  photoUrl?: string;
+}): Promise<void> {
+  await supabase.from('app_users').upsert(
+    {
+      email: user.email,
+      display_name: user.displayName,
+      photo_url: user.photoUrl ?? null,
+    },
+    { onConflict: 'email' }
+  );
+}
+
 // === MAPPERS ===
 
 function mapDbSongToMasterSong(row: any): MasterSong {

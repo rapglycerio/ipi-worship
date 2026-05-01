@@ -1,5 +1,6 @@
 import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
+import { getUserRole, upsertAppUser } from '@/lib/data';
 
 const handler = NextAuth({
   providers: [
@@ -9,22 +10,39 @@ const handler = NextAuth({
     }),
   ],
   callbacks: {
-    async signIn({ user, account }) {
-      // Allow all Google sign-ins
+    async signIn({ user }) {
+      if (user.email) {
+        // Registra ou atualiza o usuário na tabela app_users.
+        // O role padrão é 'visitor'; promova manualmente via SQL no Supabase.
+        await upsertAppUser({
+          email: user.email,
+          displayName: user.name ?? user.email.split('@')[0],
+          photoUrl: user.image ?? undefined,
+        }).catch(() => {
+          // Não bloqueia o login se o Supabase estiver fora do ar
+        });
+      }
       return true;
     },
-    async session({ session, token }) {
-      // Add user id to session
-      if (session.user && token.sub) {
-        (session.user as any).id = token.sub;
-      }
-      return session;
-    },
+
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
+        // Busca o papel do usuário no primeiro login
+        if (user.email) {
+          const role = await getUserRole(user.email).catch(() => null);
+          token.role = role ?? 'visitor';
+        }
       }
       return token;
+    },
+
+    async session({ session, token }) {
+      if (session.user) {
+        if (token.sub) (session.user as any).id = token.sub;
+        if (token.role) (session.user as any).role = token.role;
+      }
+      return session;
     },
   },
   pages: {
