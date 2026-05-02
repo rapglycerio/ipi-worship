@@ -593,6 +593,7 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
   };
 
   const handleSuggest = async () => {
+    const user = session?.user;
     if (!user || suggesting) return;
     setSuggesting(true);
     try {
