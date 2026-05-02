@@ -1,22 +1,7 @@
 'use client';
 
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-  arrayMove,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import type { ChordBlock, ChordLine, BlockType } from '@/types';
-import { GripVertical, Plus, Trash2, Copy } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, Trash2, Copy } from 'lucide-react';
 
 // ── helpers ──────────────────────────────────────────────────
 
@@ -46,25 +31,34 @@ export const BLOCK_TYPE_OPTIONS: { value: BlockType; label: string }[] = [
   { value: 'tag', label: 'Tag' },
 ];
 
-// ── SortableBlockCard ─────────────────────────────────────────
+const BLOCK_ACCENT: Record<BlockType, string> = {
+  intro:      'border-l-info/60',
+  verse:      'border-l-accent/40',
+  pre_chorus: 'border-l-warning/50',
+  chorus:     'border-l-accent',
+  bridge:     'border-l-success/60',
+  interlude:  'border-l-subtle/60',
+  outro:      'border-l-muted/40',
+  tag:        'border-l-warning/40',
+};
+
+// ── BlockCard ─────────────────────────────────────────────────
 
 interface BlockCardProps {
   block: ChordBlock;
+  isFirst: boolean;
+  isLast: boolean;
   onChange: (b: ChordBlock) => void;
   onDelete: () => void;
   onDuplicate: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }
 
-export function SortableBlockCard({ block, onChange, onDelete, onDuplicate }: BlockCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: block.id,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.45 : 1,
-  };
+function BlockCard({
+  block, isFirst, isLast,
+  onChange, onDelete, onDuplicate, onMoveUp, onMoveDown,
+}: BlockCardProps) {
 
   function updateLine(idx: number, field: keyof ChordLine, value: string) {
     onChange({
@@ -74,21 +68,35 @@ export function SortableBlockCard({ block, onChange, onDelete, onDuplicate }: Bl
   }
 
   function deleteLine(idx: number) {
+    if (block.lines.length <= 1) return;
     onChange({ ...block, lines: block.lines.filter((_, i) => i !== idx) });
   }
 
+  const accent = BLOCK_ACCENT[block.type] ?? 'border-l-border';
+
   return (
-    <div ref={setNodeRef} style={style} className="bg-card border border-border rounded-xl overflow-hidden">
+    <div className={`bg-card border border-border border-l-4 ${accent} rounded-xl overflow-hidden`}>
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 bg-elevated border-b border-border flex-wrap">
-        <button
-          {...attributes}
-          {...listeners}
-          className="touch-none cursor-grab text-subtle hover:text-muted p-0.5 shrink-0"
-          aria-label="Arrastar bloco"
-        >
-          <GripVertical className="w-4 h-4" />
-        </button>
+        {/* Move up/down */}
+        <div className="flex flex-col gap-0.5 shrink-0">
+          <button
+            onClick={onMoveUp}
+            disabled={isFirst}
+            className="p-0.5 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            title="Mover para cima"
+          >
+            <ChevronUp className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={onMoveDown}
+            disabled={isLast}
+            className="p-0.5 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            title="Mover para baixo"
+          >
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
         <select
           value={block.type}
@@ -115,7 +123,7 @@ export function SortableBlockCard({ block, onChange, onDelete, onDuplicate }: Bl
             max={10}
             value={block.repeatCount}
             onChange={(e) => onChange({ ...block, repeatCount: parseInt(e.target.value) || 1 })}
-            className="w-10 px-1.5 py-1 bg-card border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50 text-center"
+            className="w-9 px-1 py-1 bg-card border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50 text-center"
           />
         </div>
 
@@ -135,46 +143,50 @@ export function SortableBlockCard({ block, onChange, onDelete, onDuplicate }: Bl
         </button>
       </div>
 
-      {/* Lines */}
-      <div className="p-3 space-y-2">
+      {/* Lines — styled like chord view */}
+      <div className="p-3 space-y-3">
         {block.lines.map((line, i) => (
-          <div key={i} className="flex gap-2 items-start">
-            <div className="flex-1 space-y-1 min-w-0">
-              <input
-                value={line.chords}
-                onChange={(e) => updateLine(i, 'chords', e.target.value)}
-                placeholder="Acordes: Em  G  D  A"
-                className="w-full px-2 py-1.5 bg-elevated border border-border rounded text-xs text-foreground font-mono placeholder:text-subtle focus:outline-none focus:border-accent/50"
-              />
+          <div key={i} className="group relative">
+            {/* Chords row */}
+            <input
+              value={line.chords}
+              onChange={(e) => updateLine(i, 'chords', e.target.value)}
+              placeholder="Acordes: Em  G  D  A"
+              className="w-full px-0 py-0.5 bg-transparent border-b border-dashed border-accent/30 focus:border-accent/70 text-xs text-accent font-mono placeholder:text-subtle/50 focus:outline-none transition-colors"
+            />
+            {/* Lyrics row */}
+            <div className="flex items-end gap-2 mt-0.5">
               <input
                 value={line.lyrics}
                 onChange={(e) => updateLine(i, 'lyrics', e.target.value)}
                 placeholder="Letra..."
-                className="w-full px-2 py-1.5 bg-elevated border border-border rounded text-xs text-foreground placeholder:text-subtle focus:outline-none focus:border-accent/50"
+                className="flex-1 px-0 py-0.5 bg-transparent border-b border-dashed border-border focus:border-foreground/30 text-sm text-foreground placeholder:text-subtle/50 focus:outline-none transition-colors"
               />
+              <button
+                onClick={() => deleteLine(i)}
+                disabled={block.lines.length <= 1}
+                className="shrink-0 mb-0.5 p-0.5 text-subtle/40 hover:text-danger disabled:opacity-0 transition-colors cursor-pointer"
+                title="Excluir linha"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
             </div>
-            <button
-              onClick={() => deleteLine(i)}
-              className="p-1 text-subtle hover:text-danger transition-colors cursor-pointer mt-1.5 shrink-0"
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
           </div>
         ))}
 
         <button
           onClick={() => onChange({ ...block, lines: [...block.lines, { chords: '', lyrics: '' }] })}
-          className="flex items-center gap-1.5 text-[11px] text-accent hover:text-accent/80 font-medium cursor-pointer transition-colors mt-1"
+          className="flex items-center gap-1.5 text-[11px] text-accent/70 hover:text-accent font-medium cursor-pointer transition-colors mt-1"
         >
           <Plus className="w-3 h-3" />
-          Adicionar Linha
+          Adicionar linha
         </button>
       </div>
     </div>
   );
 }
 
-// ── BlockEditor (full DnD list + add button) ──────────────────
+// ── BlockEditor ───────────────────────────────────────────────
 
 interface BlockEditorProps {
   blocks: ChordBlock[];
@@ -182,17 +194,6 @@ interface BlockEditorProps {
 }
 
 export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIdx = blocks.findIndex((b) => b.id === active.id);
-      const newIdx = blocks.findIndex((b) => b.id === over.id);
-      onChange(arrayMove(blocks, oldIdx, newIdx));
-    }
-  }
-
   function updateBlock(id: string, updated: ChordBlock) {
     onChange(blocks.map((b) => (b.id === id ? updated : b)));
   }
@@ -210,30 +211,39 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
     onChange(next);
   }
 
+  function moveBlock(id: string, direction: 'up' | 'down') {
+    const idx = blocks.findIndex((b) => b.id === id);
+    if (idx === -1) return;
+    const next = [...blocks];
+    const target = direction === 'up' ? idx - 1 : idx + 1;
+    if (target < 0 || target >= next.length) return;
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onChange(next);
+  }
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-1">
         <span className="text-[10px] font-bold uppercase tracking-widest text-accent">
           {blocks.length} bloco{blocks.length !== 1 ? 's' : ''}
         </span>
-        <span className="text-[10px] text-subtle">Arraste para reordenar</span>
       </div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-3">
-            {blocks.map((block) => (
-              <SortableBlockCard
-                key={block.id}
-                block={block}
-                onChange={(updated) => updateBlock(block.id, updated)}
-                onDelete={() => deleteBlock(block.id)}
-                onDuplicate={() => duplicateBlock(block.id)}
-              />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
+      <div className="space-y-3">
+        {blocks.map((block, i) => (
+          <BlockCard
+            key={block.id}
+            block={block}
+            isFirst={i === 0}
+            isLast={i === blocks.length - 1}
+            onChange={(updated) => updateBlock(block.id, updated)}
+            onDelete={() => deleteBlock(block.id)}
+            onDuplicate={() => duplicateBlock(block.id)}
+            onMoveUp={() => moveBlock(block.id, 'up')}
+            onMoveDown={() => moveBlock(block.id, 'down')}
+          />
+        ))}
+      </div>
 
       <button
         onClick={() => onChange([...blocks, newEmptyBlock()])}
