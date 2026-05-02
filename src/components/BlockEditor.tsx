@@ -1,7 +1,12 @@
 'use client';
 
-import type { ChordBlock, ChordLine, BlockType } from '@/types';
-import { ChevronUp, ChevronDown, Plus, Trash2, Copy, Repeat } from 'lucide-react';
+import { useState } from 'react';
+import type { ChordBlock, ChordLine, BlockType, StageDirection, StageDirectionItem } from '@/types';
+import {
+  ChevronUp, ChevronDown, Plus, Trash2, Copy,
+  Repeat, Mic, Volume2, VolumeX, Zap, Hand,
+  ArrowUp, ArrowDown, X as XIcon,
+} from 'lucide-react';
 
 // ── helpers ──────────────────────────────────────────────────
 
@@ -31,16 +36,131 @@ export const BLOCK_TYPE_OPTIONS: { value: BlockType; label: string }[] = [
   { value: 'tag',        label: 'Tag' },
 ];
 
-const blockTypeStyles: Record<BlockType, string> = {
-  intro:      'block-intro',
-  verse:      'block-verse',
-  pre_chorus: 'block-verse',
-  chorus:     'block-chorus',
-  bridge:     'block-bridge',
-  interlude:  'block-intro',
-  outro:      'block-intro',
-  tag:        'block-verse',
+const DIRECTION_OPTIONS: { value: StageDirection; label: string; icon: typeof Mic }[] = [
+  { value: 'crescendo',        label: 'Crescendo',         icon: ArrowUp },
+  { value: 'decrescendo',      label: 'Decrescendo',       icon: ArrowDown },
+  { value: 'a_capella',        label: 'A Cappella',        icon: Mic },
+  { value: 'solo_vozes',       label: 'Solo Vozes',        icon: Mic },
+  { value: 'solo_instrumento', label: 'Solo Instrumento',  icon: Volume2 },
+  { value: 'palmas',           label: 'Palmas',            icon: Hand },
+  { value: 'silencio',         label: 'Silêncio',          icon: VolumeX },
+  { value: 'custom',           label: 'Personalizado',     icon: Zap },
+];
+
+const directionIcons: Record<StageDirection, typeof Mic> = {
+  a_capella: Mic, crescendo: ArrowUp, decrescendo: ArrowDown,
+  solo_vozes: Mic, solo_instrumento: Volume2,
+  palmas: Hand, silencio: VolumeX, custom: Zap,
 };
+
+const blockTypeStyles: Record<BlockType, string> = {
+  intro: 'block-intro', verse: 'block-verse', pre_chorus: 'block-verse',
+  chorus: 'block-chorus', bridge: 'block-bridge',
+  interlude: 'block-intro', outro: 'block-intro', tag: 'block-verse',
+};
+
+// ── DirectionsEditor ──────────────────────────────────────────
+
+interface DirectionsEditorProps {
+  directions: StageDirectionItem[];
+  onChange: (d: StageDirectionItem[]) => void;
+}
+
+function DirectionsEditor({ directions, onChange }: DirectionsEditorProps) {
+  const [addingType, setAddingType] = useState<StageDirection>('crescendo');
+  const [addingLabel, setAddingLabel] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+
+  function addDirection() {
+    const opt = DIRECTION_OPTIONS.find((o) => o.value === addingType);
+    const label = addingLabel.trim() || opt?.label || addingType;
+    onChange([...directions, { type: addingType, label }]);
+    setAddingLabel('');
+    setShowAdd(false);
+  }
+
+  function removeDirection(idx: number) {
+    onChange(directions.filter((_, i) => i !== idx));
+  }
+
+  return (
+    <div className="mt-2 pt-2 border-t border-dashed border-border/60">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-subtle">Direções</span>
+
+        {/* Existing pills */}
+        {directions.map((dir, i) => {
+          const Icon = directionIcons[dir.type] || Zap;
+          const isWarning = ['silencio', 'decrescendo'].includes(dir.type);
+          const isInfo    = ['solo_instrumento', 'custom'].includes(dir.type);
+          return (
+            <span
+              key={i}
+              className={`stage-pill pr-1 ${isWarning ? 'stage-pill--warning' : isInfo ? 'stage-pill--info' : ''}`}
+            >
+              <Icon className="w-3 h-3" />
+              {dir.label}
+              <button
+                onClick={() => removeDirection(i)}
+                className="ml-1 hover:opacity-70 cursor-pointer"
+                title="Remover"
+              >
+                <XIcon className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          );
+        })}
+
+        {/* Add button */}
+        {!showAdd && (
+          <button
+            onClick={() => setShowAdd(true)}
+            className="stage-pill cursor-pointer hover:opacity-80 transition-opacity"
+            title="Adicionar direção"
+          >
+            <Plus className="w-3 h-3" />
+            Adicionar
+          </button>
+        )}
+      </div>
+
+      {/* Inline add form */}
+      {showAdd && (
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          <select
+            value={addingType}
+            onChange={(e) => setAddingType(e.target.value as StageDirection)}
+            className="px-2 py-1 bg-elevated border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50 cursor-pointer"
+          >
+            {DIRECTION_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          <input
+            value={addingLabel}
+            onChange={(e) => setAddingLabel(e.target.value)}
+            placeholder="Rótulo (opcional)"
+            className="flex-1 min-w-[120px] px-2 py-1 bg-elevated border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50"
+            onKeyDown={(e) => { if (e.key === 'Enter') addDirection(); if (e.key === 'Escape') setShowAdd(false); }}
+            autoFocus
+          />
+          <button
+            onClick={addDirection}
+            className="px-3 py-1 bg-accent text-white rounded-md text-xs font-semibold hover:bg-accent/90 cursor-pointer transition-colors"
+          >
+            OK
+          </button>
+          <button
+            onClick={() => setShowAdd(false)}
+            className="px-2 py-1 bg-elevated text-muted rounded-md text-xs hover:bg-border cursor-pointer transition-colors"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── BlockCard ─────────────────────────────────────────────────
 
@@ -72,94 +192,80 @@ function BlockCard({
   const blockStyle = blockTypeStyles[block.type] ?? 'block-verse';
 
   return (
-    <div className={`${blockStyle} py-3 mb-3 relative group`}>
-      {/* Block header — same look as ChordBlockView */}
+    <div className={`${blockStyle} py-3 mb-3 group`}>
+      {/* ── Header — identical to ChordBlockView ── */}
       <div className="flex items-start justify-between mb-2 gap-2">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
-          {/* Editable label — styled as the accent header */}
+          {/* Editable label — same accent style */}
           <input
             value={block.label}
             onChange={(e) => onChange({ ...block, label: e.target.value })}
-            className="text-[11px] font-bold uppercase tracking-wider text-accent bg-transparent border-0 focus:outline-none focus:ring-0 p-0 min-w-0 w-auto"
-            style={{ width: `${Math.max(block.label.length, 4)}ch` }}
+            className="text-[11px] font-bold uppercase tracking-wider text-accent bg-transparent border-0 focus:outline-none p-0 min-w-[2ch]"
+            style={{ width: `${Math.max(block.label.length, 3) + 1}ch` }}
+            title="Editar rótulo"
           />
-
-          {/* Type selector — subtle */}
+          {/* Type selector */}
           <select
             value={block.type}
             onChange={(e) => onChange({ ...block, type: e.target.value as BlockType })}
-            className="text-[10px] text-subtle bg-transparent border-0 focus:outline-none cursor-pointer p-0 -ml-1"
+            className="text-[10px] text-subtle bg-transparent border-0 focus:outline-none cursor-pointer p-0"
+            title="Tipo de bloco"
           >
             {BLOCK_TYPE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
-
-          {/* Repeat count */}
-          <div className="stage-pill flex items-center gap-1">
+          {/* Repeat pill */}
+          <span className="stage-pill">
             <Repeat className="w-3 h-3" />
             <input
-              type="number"
-              min={1}
-              max={10}
+              type="number" min={1} max={10}
               value={block.repeatCount}
               onChange={(e) => onChange({ ...block, repeatCount: parseInt(e.target.value) || 1 })}
               className="w-5 bg-transparent border-0 focus:outline-none text-center p-0 text-[11px]"
+              title="Repetições"
             />
             <span className="text-[11px]">x</span>
-          </div>
+          </span>
         </div>
 
-        {/* Actions — visible on hover */}
+        {/* Actions — hover to reveal */}
         <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={onMoveUp}
-            disabled={isFirst}
-            className="p-1 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors cursor-pointer"
-            title="Mover para cima"
-          >
-            <ChevronUp className="w-3.5 h-3.5" />
+          <button onClick={onMoveUp}     disabled={isFirst} className="p-1 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer" title="Subir">
+            <ChevronUp   className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={onMoveDown}
-            disabled={isLast}
-            className="p-1 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors cursor-pointer"
-            title="Mover para baixo"
-          >
+          <button onClick={onMoveDown}   disabled={isLast}  className="p-1 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer" title="Descer">
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
-          <button onClick={onDuplicate} className="p-1 text-subtle hover:text-accent transition-colors cursor-pointer" title="Duplicar">
-            <Copy className="w-3.5 h-3.5" />
+          <button onClick={onDuplicate}  className="p-1 text-subtle hover:text-accent  cursor-pointer" title="Duplicar">
+            <Copy        className="w-3.5 h-3.5" />
           </button>
-          <button onClick={onDelete} className="p-1 text-subtle hover:text-danger transition-colors cursor-pointer" title="Excluir bloco">
-            <Trash2 className="w-3.5 h-3.5" />
+          <button onClick={onDelete}     className="p-1 text-subtle hover:text-danger  cursor-pointer" title="Excluir bloco">
+            <Trash2      className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Lines — chord + lyric inputs using the same CSS classes as ChordBlockView */}
-      <div className="space-y-0.5">
+      {/* ── Lines — chord-line + lyric-line style ── */}
+      <div className="space-y-1">
         {block.lines.map((line, i) => (
           <div key={i} className="group/line relative pr-6">
-            {/* Chords — same style as .chord-line */}
             <input
               value={line.chords}
               onChange={(e) => updateLine(i, 'chords', e.target.value)}
               placeholder="acordes..."
-              className="chord-line w-full bg-transparent border-0 focus:outline-none placeholder:opacity-30 focus:placeholder:opacity-50"
+              className="chord-line w-full bg-transparent border-0 border-b border-dashed border-accent/20 focus:border-accent/50 focus:outline-none placeholder:opacity-30 pb-0.5"
             />
-            {/* Lyrics — same style as .lyric-line */}
             <input
               value={line.lyrics}
               onChange={(e) => updateLine(i, 'lyrics', e.target.value)}
               placeholder="letra..."
-              className="lyric-line w-full bg-transparent border-0 focus:outline-none placeholder:text-subtle placeholder:opacity-50 focus:placeholder:opacity-80"
+              className="lyric-line w-full bg-transparent border-0 border-b border-dashed border-border/30 focus:border-border/60 focus:outline-none placeholder:text-subtle placeholder:opacity-50 pb-0.5 mt-0.5"
             />
-            {/* Delete line — only on hover */}
             <button
               onClick={() => deleteLine(i)}
               disabled={block.lines.length <= 1}
-              className="absolute right-0 top-1/2 -translate-y-1/2 p-0.5 text-subtle/0 group-hover/line:text-subtle/60 hover:!text-danger disabled:!opacity-0 transition-colors cursor-pointer"
+              className="absolute right-0 top-2 p-0.5 text-transparent group-hover/line:text-subtle/50 hover:!text-danger disabled:!opacity-0 transition-colors cursor-pointer"
               title="Remover linha"
             >
               <Trash2 className="w-3 h-3" />
@@ -168,7 +274,7 @@ function BlockCard({
         ))}
       </div>
 
-      {/* Add line */}
+      {/* ── Add line ── */}
       <button
         onClick={() => onChange({ ...block, lines: [...block.lines, { chords: '', lyrics: '' }] })}
         className="mt-2 flex items-center gap-1 text-[11px] text-accent/50 hover:text-accent transition-colors cursor-pointer"
@@ -176,6 +282,12 @@ function BlockCard({
         <Plus className="w-3 h-3" />
         linha
       </button>
+
+      {/* ── Stage directions ── */}
+      <DirectionsEditor
+        directions={block.directions}
+        onChange={(d) => onChange({ ...block, directions: d })}
+      />
     </div>
   );
 }
@@ -219,7 +331,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
   return (
     <div>
       <p className="text-[10px] font-bold uppercase tracking-widest text-accent mb-3">
-        {blocks.length} bloco{blocks.length !== 1 ? 's' : ''} — passe o mouse para ver as ações
+        {blocks.length} bloco{blocks.length !== 1 ? 's' : ''}
       </p>
 
       {blocks.map((block, i) => (

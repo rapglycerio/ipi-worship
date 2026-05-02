@@ -31,13 +31,21 @@ const navItems = [
   { href: '/importar',  label: 'Importar Cifra',       icon: Upload },
 ];
 
+// Items shown in the bottom tab bar on mobile (most used)
+const bottomTabItems = [
+  { href: '/',          label: 'Semana',   icon: ListMusic },
+  { href: '/musicas',   label: 'Músicas',  icon: Library },
+  { href: '/playlists', label: 'Playlists',icon: Music },
+  { href: '/importar',  label: 'Importar', icon: Upload },
+];
+
 const COLLAPSED_KEY = 'sidebar_collapsed';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const [isOpen, setIsOpen] = useState(false);       // mobile drawer
-  const [isCollapsed, setIsCollapsed] = useState(false); // desktop icon-only
+  const [isOpen, setIsOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDark, setIsDark] = useState(true);
 
   useEffect(() => {
@@ -67,20 +75,30 @@ export default function Sidebar() {
     <>
       {/* ── Mobile top bar ── */}
       <header className="fixed top-0 left-0 right-0 z-50 glass-strong flex items-center justify-between px-4 h-14 md:hidden no-print">
-        <button onClick={() => setIsOpen(true)} className="touch-target" aria-label="Abrir menu">
+        <button
+          onClick={() => setIsOpen(true)}
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center"
+          aria-label="Abrir menu"
+        >
           <Menu className="w-6 h-6 text-foreground" />
         </button>
+
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center">
             <Music className="w-4 h-4 text-white" />
           </div>
           <span className="text-sm font-semibold text-foreground tracking-tight">IPI Imirim</span>
         </div>
+
         <div className="flex items-center gap-1">
-          <Link href="/busca" className="touch-target" aria-label="Buscar">
+          <Link href="/busca" className="min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Buscar">
             <Search className="w-5 h-5 text-muted" />
           </Link>
-          <button onClick={toggleTheme} className="touch-target" aria-label="Alternar tema">
+          <button
+            onClick={toggleTheme}
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center"
+            aria-label="Alternar tema"
+          >
             {isDark ? <Sun className="w-5 h-5 text-muted" /> : <Moon className="w-5 h-5 text-muted" />}
           </button>
         </div>
@@ -88,10 +106,10 @@ export default function Sidebar() {
 
       {/* ── Mobile overlay ── */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 md:hidden" onClick={() => setIsOpen(false)} />
+        <div className="fixed inset-0 z-50 bg-black/60 md:hidden" onClick={() => setIsOpen(false)} />
       )}
 
-      {/* ── Sidebar ── */}
+      {/* ── Sidebar (desktop always visible; mobile = drawer) ── */}
       <nav
         className={`
           fixed top-0 left-0 z-50 h-full
@@ -99,47 +117,59 @@ export default function Sidebar() {
           flex flex-col overflow-hidden
           transition-all duration-300 ease-out
           no-print
+          w-[280px]
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0
           ${isCollapsed ? 'md:w-14' : 'md:w-[280px]'}
-          w-[280px]
         `}
       >
-        {/* Brand row */}
-        <div className="flex items-center h-16 border-b border-border shrink-0 px-3 gap-3">
-          <div className="w-9 h-9 rounded-xl bg-accent flex items-center justify-center shadow-sm shrink-0">
-            <Music className="w-5 h-5 text-white" />
+        {/* ── Brand / toggle row ── */}
+        {isCollapsed ? (
+          /* Collapsed desktop: only the expand button */
+          <div className="hidden md:flex items-center justify-center h-16 border-b border-border shrink-0">
+            <button
+              onClick={toggleCollapsed}
+              className="w-10 h-10 flex items-center justify-center rounded-lg text-muted hover:text-accent hover:bg-elevated transition-colors cursor-pointer"
+              title="Expandir menu"
+            >
+              <ChevronsRight className="w-5 h-5" />
+            </button>
           </div>
-          {!isCollapsed && (
+        ) : (
+          /* Expanded: full brand row */
+          <div className="flex items-center h-16 border-b border-border shrink-0 px-3 gap-2">
+            <div className="w-9 h-9 rounded-xl bg-accent flex items-center justify-center shadow-sm shrink-0">
+              <Music className="w-5 h-5 text-white" />
+            </div>
             <div className="flex-1 min-w-0">
               <h1 className="text-sm font-bold text-foreground tracking-tight leading-none truncate">IPI do Imirim</h1>
               <p className="text-[11px] text-muted mt-0.5">Louvor & Liturgia</p>
             </div>
-          )}
-          {/* Mobile: close drawer */}
-          <button onClick={() => setIsOpen(false)} className="touch-target md:hidden ml-auto" aria-label="Fechar menu">
-            <X className="w-5 h-5 text-muted" />
-          </button>
-          {/* Desktop: toggle collapse */}
-          <button
-            onClick={toggleCollapsed}
-            className="hidden md:flex touch-target ml-auto"
-            aria-label={isCollapsed ? 'Expandir menu' : 'Minimizar menu'}
-            title={isCollapsed ? 'Expandir menu' : 'Minimizar menu'}
-          >
-            {isCollapsed
-              ? <ChevronsRight className="w-4 h-4 text-muted hover:text-foreground transition-colors" />
-              : <ChevronsLeft  className="w-4 h-4 text-muted hover:text-foreground transition-colors" />
-            }
-          </button>
-        </div>
+            {/* Mobile: close drawer */}
+            <button
+              onClick={() => setIsOpen(false)}
+              className="md:hidden w-10 h-10 flex items-center justify-center rounded-lg text-muted hover:bg-elevated transition-colors cursor-pointer shrink-0"
+              aria-label="Fechar menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            {/* Desktop: collapse to icons */}
+            <button
+              onClick={toggleCollapsed}
+              className="hidden md:flex w-10 h-10 items-center justify-center rounded-lg text-muted hover:text-accent hover:bg-elevated transition-colors cursor-pointer shrink-0"
+              title="Minimizar menu"
+            >
+              <ChevronsLeft className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
-        {/* Search — only when expanded */}
+        {/* ── Search (expanded only) ── */}
         {!isCollapsed && (
-          <div className="px-4 py-3">
+          <div className="px-3 py-3">
             <Link
               href="/busca"
-              className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-elevated text-muted text-sm cursor-pointer hover:bg-border transition-colors"
+              className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-elevated text-muted text-sm cursor-pointer hover:bg-border transition-colors min-h-[44px]"
               onClick={() => setIsOpen(false)}
             >
               <Search className="w-4 h-4 shrink-0" />
@@ -148,10 +178,10 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Nav items */}
-        <div className="flex-1 overflow-y-auto px-2 py-2">
+        {/* ── Nav items ── */}
+        <div className="flex-1 overflow-y-auto px-2 py-1">
           {!isCollapsed && (
-            <p className="text-[10px] font-bold uppercase tracking-widest text-subtle px-2 mb-2">Menu</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-subtle px-2 mb-1">Menu</p>
           )}
           <ul className="space-y-0.5">
             {navItems.map((item) => {
@@ -165,11 +195,12 @@ export default function Sidebar() {
                     title={isCollapsed ? item.label : undefined}
                     className={`
                       flex items-center gap-3 rounded-lg text-sm font-medium
-                      transition-all duration-200 cursor-pointer
-                      ${isCollapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'}
+                      transition-all duration-200 cursor-pointer min-h-[44px]
+                      ${isCollapsed ? 'justify-center px-0' : 'px-3'}
                       ${isActive
                         ? 'bg-accent-subtle text-accent shadow-sm'
-                        : 'text-muted hover:bg-elevated hover:text-foreground'}
+                        : 'text-muted hover:bg-elevated hover:text-foreground'
+                      }
                     `}
                   >
                     <Icon className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-accent' : ''}`} />
@@ -186,9 +217,8 @@ export default function Sidebar() {
           </ul>
         </div>
 
-        {/* Footer: Auth + Theme */}
-        <div className="border-t border-border py-2 px-2 space-y-1 shrink-0">
-          {/* User info — only expanded */}
+        {/* ── Footer: Auth + Theme ── */}
+        <div className="border-t border-border py-2 px-2 space-y-0.5 shrink-0">
           {!isCollapsed && user && (
             <div className="px-3 py-2 rounded-lg bg-elevated mb-1">
               <p className="text-xs font-semibold text-foreground truncate">{user.name}</p>
@@ -201,13 +231,12 @@ export default function Sidebar() {
             </div>
           )}
 
-          {/* Login / Logout */}
           {user ? (
             <button
               onClick={() => signOut()}
               title={isCollapsed ? 'Sair' : undefined}
-              className={`flex items-center gap-3 w-full rounded-lg text-sm text-muted hover:bg-elevated hover:text-foreground transition-colors cursor-pointer
-                ${isCollapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'}`}
+              className={`flex items-center gap-3 w-full rounded-lg text-sm text-muted hover:bg-elevated hover:text-foreground transition-colors cursor-pointer min-h-[44px]
+                ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}
             >
               <LogOut className="w-[18px] h-[18px] shrink-0" />
               {!isCollapsed && <span>Sair</span>}
@@ -216,25 +245,52 @@ export default function Sidebar() {
             <button
               onClick={() => signIn('google')}
               title={isCollapsed ? 'Entrar com Google' : undefined}
-              className={`flex items-center gap-3 w-full rounded-lg text-sm text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer font-medium
-                ${isCollapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'}`}
+              className={`flex items-center gap-3 w-full rounded-lg text-sm text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer font-medium min-h-[44px]
+                ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}
             >
               <LogIn className="w-[18px] h-[18px] shrink-0" />
               {!isCollapsed && <span>Entrar com Google</span>}
             </button>
           )}
 
-          {/* Theme */}
           <button
             onClick={toggleTheme}
             title={isCollapsed ? (isDark ? 'Modo Claro' : 'Modo Escuro') : undefined}
-            className={`flex items-center gap-3 w-full rounded-lg text-sm text-muted hover:bg-elevated transition-colors cursor-pointer
-              ${isCollapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'}`}
+            className={`flex items-center gap-3 w-full rounded-lg text-sm text-muted hover:bg-elevated transition-colors cursor-pointer min-h-[44px]
+              ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}
           >
-            {isDark
-              ? <Sun  className="w-[18px] h-[18px] shrink-0" />
-              : <Moon className="w-[18px] h-[18px] shrink-0" />}
+            {isDark ? <Sun className="w-[18px] h-[18px] shrink-0" /> : <Moon className="w-[18px] h-[18px] shrink-0" />}
             {!isCollapsed && <span>{isDark ? 'Modo Claro' : 'Modo Escuro'}</span>}
+          </button>
+        </div>
+      </nav>
+
+      {/* ── Mobile bottom tab bar ── */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden no-print bg-card border-t border-border pb-safe">
+        <div className="flex items-stretch">
+          {bottomTabItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] transition-colors
+                  ${isActive ? 'text-accent' : 'text-muted hover:text-foreground'}`}
+              >
+                <Icon className={`w-5 h-5 ${isActive ? 'text-accent' : ''}`} />
+                <span className={`text-[10px] font-medium ${isActive ? 'text-accent' : ''}`}>{item.label}</span>
+                {isActive && <div className="absolute bottom-1 w-1 h-1 rounded-full bg-accent" />}
+              </Link>
+            );
+          })}
+          {/* Menu button to open full drawer */}
+          <button
+            onClick={() => setIsOpen(true)}
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] text-muted hover:text-foreground transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Menu</span>
           </button>
         </div>
       </nav>

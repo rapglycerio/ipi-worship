@@ -353,6 +353,11 @@ body {
   }
 }
 
+/* --- SAFE AREA (iPhone notch / home indicator) --- */
+.pb-safe {
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
 /* --- SIDEBAR COLLAPSED (icon-only, 56px) --- */
 @media (min-width: 768px) {
   html[data-sidebar="collapsed"] main {
