@@ -3,7 +3,28 @@
     "allow": [
       "Bash(npx tsc *)",
       "Bash(npm run *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "mcp__mcp-registry__list_connectors",
+      "Bash(supabase --version)",
+      "Bash(vercel --version)",
+      "Bash(npx supabase *)",
+      "Bash(npx vercel *)",
+      "mcp__fb02c033-3102-4ad8-84e7-75279395a66f__list_projects",
+      "mcp__a87d4bf7-2993-4dad-96d5-af124b25c560__list_teams",
+      "mcp__fb02c033-3102-4ad8-84e7-75279395a66f__get_publishable_keys",
+      "mcp__fb02c033-3102-4ad8-84e7-75279395a66f__get_project_url",
+      "mcp__fb02c033-3102-4ad8-84e7-75279395a66f__list_tables",
+      "Bash(openssl rand *)",
+      "mcp__fb02c033-3102-4ad8-84e7-75279395a66f__list_migrations",
+      "mcp__fb02c033-3102-4ad8-84e7-75279395a66f__apply_migration",
+      "mcp__a87d4bf7-2993-4dad-96d5-af124b25c560__get_project",
+      "mcp__fb02c033-3102-4ad8-84e7-75279395a66f__execute_sql",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__a87d4bf7-2993-4dad-96d5-af124b25c560__web_fetch_vercel_url",
+      "mcp__a87d4bf7-2993-4dad-96d5-af124b25c560__get_access_to_vercel_url",
+      "WebFetch(domain:ipi-worship-qwz5qd2ww-rapglycerios-projects.vercel.app)",
+      "WebFetch(domain:ipi-worship.vercel.app)"
     ]
   }
 }

@@ -32,6 +32,10 @@ import {
   Loader2,
   PlusCircle,
   Search,
+  Share2,
+  Check,
+  History,
+  Clock,
 } from 'lucide-react';
 import Link from 'next/link';
 import type { Playlist, WorshipArrangement, MasterSong } from '@/types';
@@ -55,14 +59,30 @@ interface PlaylistFormData {
 // Main page
 // =============================================
 
+type Tab = 'upcoming' | 'past';
+
 export default function PlaylistsPage() {
   const { playlists, loading, refetch } = usePlaylists();
   const { songs } = useSongs();
 
+  const [tab, setTab] = useState<Tab>('upcoming');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const upcomingPlaylists = playlists
+    .filter((pl) => new Date(pl.serviceDate + 'T12:00:00') >= today)
+    .sort((a, b) => a.serviceDate.localeCompare(b.serviceDate));
+
+  const pastPlaylists = playlists
+    .filter((pl) => new Date(pl.serviceDate + 'T12:00:00') < today)
+    .sort((a, b) => b.serviceDate.localeCompare(a.serviceDate));
+
+  const visiblePlaylists = tab === 'upcoming' ? upcomingPlaylists : pastPlaylists;
 
   const selectedPlaylist = selectedId ? playlists.find((p) => p.id === selectedId) : null;
 
@@ -137,6 +157,38 @@ export default function PlaylistsPage() {
             Nova Playlist
           </button>
         </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 bg-elevated rounded-xl p-1">
+          <button
+            onClick={() => setTab('upcoming')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              tab === 'upcoming' ? 'bg-card text-foreground shadow-sm' : 'text-muted hover:text-foreground'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            Próximas
+            {upcomingPlaylists.length > 0 && (
+              <span className="bg-accent/15 text-accent text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {upcomingPlaylists.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setTab('past')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              tab === 'past' ? 'bg-card text-foreground shadow-sm' : 'text-muted hover:text-foreground'
+            }`}
+          >
+            <History className="w-3.5 h-3.5" />
+            Anteriores
+            {pastPlaylists.length > 0 && (
+              <span className="bg-elevated text-subtle text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {pastPlaylists.length}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -145,7 +197,7 @@ export default function PlaylistsPage() {
         </div>
       ) : (
         <div className="px-5 md:px-8 pb-12 space-y-3">
-          {playlists.map((pl) => {
+          {visiblePlaylists.map((pl) => {
             const songCount = pl.arrangements.length;
             const serviceLabel = serviceTypeLabel(pl.serviceType);
             const formattedDate = formatDate(pl.serviceDate);
@@ -215,17 +267,23 @@ export default function PlaylistsPage() {
             );
           })}
 
-          {playlists.length === 0 && (
+          {visiblePlaylists.length === 0 && (
             <div className="text-center py-16">
               <ListMusic className="w-12 h-12 text-subtle mx-auto mb-4" />
-              <h2 className="text-lg font-semibold text-foreground mb-1">Nenhuma playlist ainda</h2>
-              <p className="text-sm text-muted mb-4">Crie a primeira playlist do culto.</p>
-              <button
-                onClick={openCreate}
-                className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-semibold cursor-pointer hover:bg-accent/90 transition-colors"
-              >
-                Criar Playlist
-              </button>
+              <h2 className="text-lg font-semibold text-foreground mb-1">
+                {tab === 'upcoming' ? 'Nenhuma playlist programada' : 'Nenhuma playlist anterior'}
+              </h2>
+              <p className="text-sm text-muted mb-4">
+                {tab === 'upcoming' ? 'Crie uma playlist para o próximo culto.' : 'As playlists passadas aparecerão aqui.'}
+              </p>
+              {tab === 'upcoming' && (
+                <button
+                  onClick={openCreate}
+                  className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-semibold cursor-pointer hover:bg-accent/90 transition-colors"
+                >
+                  Criar Playlist
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -262,6 +320,24 @@ function PlaylistDetail({
 }) {
   const [arrangements, setArrangements] = useState<WorshipArrangement[]>(playlist.arrangements);
   const [showAddSong, setShowAddSong] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/playlists/${playlist.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: playlist.name, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    } catch {
+      await navigator.clipboard.writeText(url).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -346,13 +422,23 @@ function PlaylistDetail({
               </div>
             </div>
           </div>
-          <button
-            onClick={() => onEditPlaylist(playlist)}
-            className="p-2 rounded-lg text-muted hover:text-accent hover:bg-accent/10 transition-all cursor-pointer"
-            aria-label="Editar playlist"
-          >
-            <Pencil className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleShare}
+              className="p-2 rounded-lg text-muted hover:text-accent hover:bg-accent/10 transition-all cursor-pointer"
+              aria-label="Compartilhar playlist"
+              title="Compartilhar link"
+            >
+              {copied ? <Check className="w-4 h-4 text-success" /> : <Share2 className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => onEditPlaylist(playlist)}
+              className="p-2 rounded-lg text-muted hover:text-accent hover:bg-accent/10 transition-all cursor-pointer"
+              aria-label="Editar playlist"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 

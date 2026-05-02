@@ -179,7 +179,7 @@ export interface AppUser {
 }
 
 /** View mode for chord display */
-export type ViewMode = 'chords_and_lyrics' | 'chords_only' | 'lyrics_only';
+export type ViewMode = 'chords_and_lyrics' | 'lyrics_only';
 
 /** Font size presets for stage display */
 export type FontSizePreset = 'sm' | 'md' | 'lg' | 'xl' | '2xl';

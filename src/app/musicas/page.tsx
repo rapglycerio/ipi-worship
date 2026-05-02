@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useSongs } from '@/hooks/useData';
+import { useSongs, usePlaylists } from '@/hooks/useData';
 import { liturgicalTagLabels } from '@/data/mock-songs';
 import SongCard from '@/components/SongCard';
 import type { LiturgicalTag, SongNature } from '@/types';
@@ -13,6 +13,9 @@ import {
   Tag,
   Music2,
   Loader2,
+  TrendingUp,
+  ListMusic,
+  Users,
 } from 'lucide-react';
 
 const allTags: LiturgicalTag[] = [
@@ -22,6 +25,7 @@ const allTags: LiturgicalTag[] = [
 
 export default function MusicasPage() {
   const { songs, loading } = useSongs();
+  const { playlists } = usePlaylists();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedNature, setSelectedNature] = useState<SongNature | 'all'>('all');
   const [selectedTag, setSelectedTag] = useState<LiturgicalTag | null>(null);
@@ -55,6 +59,10 @@ export default function MusicasPage() {
     });
   }, [songs, searchQuery, selectedNature, selectedTag]);
 
+  const approvedCount = songs.filter((s) => s.analysis?.status === 'approved').length;
+  const pendingCount = songs.filter((s) => !s.analysis || s.analysis.status === 'pending').length;
+  const artistCount = new Set(songs.flatMap((s) => s.versions.flatMap((v) => v.artists))).size;
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -76,6 +84,40 @@ export default function MusicasPage() {
             <p className="text-xs text-muted">{songs.length} músicas no acervo</p>
           </div>
         </div>
+
+        {/* Stats */}
+        {!loading && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+            <div className="bg-card border border-border rounded-xl p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Library className="w-3.5 h-3.5 text-subtle" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-subtle">Total</span>
+              </div>
+              <p className="text-xl font-bold text-foreground">{songs.length}</p>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <TrendingUp className="w-3.5 h-3.5 text-accent" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-subtle">Aprovadas</span>
+              </div>
+              <p className="text-xl font-bold text-accent">{approvedCount}</p>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <ListMusic className="w-3.5 h-3.5 text-subtle" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-subtle">Pendentes</span>
+              </div>
+              <p className="text-xl font-bold text-warning">{pendingCount}</p>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Users className="w-3.5 h-3.5 text-subtle" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-subtle">Artistas</span>
+              </div>
+              <p className="text-xl font-bold text-foreground">{artistCount}</p>
+            </div>
+          </div>
+        )}
 
         {/* Search Bar */}
         <div className="relative mb-3">

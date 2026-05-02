@@ -342,6 +342,40 @@ export async function updateSongMetadata(
   return true;
 }
 
+export async function updateVersionMetadata(
+  versionId: string,
+  data: {
+    key?: string;
+    bpm?: number;
+    youtubeUrl?: string;
+    artists?: string[];
+  }
+): Promise<boolean> {
+  const patch: Record<string, unknown> = {};
+  if (data.key !== undefined) patch.key = data.key;
+  if (data.bpm !== undefined) patch.bpm = data.bpm;
+  if (data.youtubeUrl !== undefined) patch.youtube_url = data.youtubeUrl || null;
+
+  if (Object.keys(patch).length > 0) {
+    const { error } = await supabase.from('song_versions').update(patch).eq('id', versionId);
+    if (error) {
+      console.error('Error updating version:', error);
+      return false;
+    }
+  }
+
+  if (data.artists !== undefined) {
+    await supabase.from('version_artists').delete().eq('version_id', versionId);
+    if (data.artists.length > 0) {
+      await supabase.from('version_artists').insert(
+        data.artists.map((name) => ({ version_id: versionId, artist_name: name }))
+      );
+    }
+  }
+
+  return true;
+}
+
 // === AUTH HELPERS ===
 
 export async function getUserRole(email: string): Promise<string | null> {

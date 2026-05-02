@@ -1,25 +1,52 @@
 'use client';
 
-import { useState } from 'react';
-import { parseCifra, extractFromCifraClubHtml, type ParseResult } from '@/lib/cifra-parser';
-import ChordBlockView, { ChordToolbar } from '@/components/ChordBlockView';
-import type { ChordBlock, SongVersion, MusicalKey, ViewMode, FontSizePreset, SongNature, LiturgicalTag, ApprovalStatus } from '@/types';
+import { useState, useCallback } from 'react';
+import { parseCifra } from '@/lib/cifra-parser';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import type { ChordBlock, ChordLine, BlockType, SongNature, LiturgicalTag } from '@/types';
 import {
   Upload,
   FileText,
-  Eye,
   Save,
   ArrowLeft,
-  AlertTriangle,
   CheckCircle2,
-  Music2,
   Link as LinkIcon,
   Tag,
-  ChevronDown,
+  GripVertical,
+  Plus,
+  Trash2,
+  Copy,
 } from 'lucide-react';
 import Link from 'next/link';
 
-const liturgicalOptions: { value: LiturgicalTag; label: string }[] = [
+// ── constants ────────────────────────────────────────────────
+
+const BLOCK_TYPE_OPTIONS: { value: BlockType; label: string }[] = [
+  { value: 'intro', label: 'Intro' },
+  { value: 'verse', label: 'Estrofe' },
+  { value: 'pre_chorus', label: 'Pré-Refrão' },
+  { value: 'chorus', label: 'Refrão' },
+  { value: 'bridge', label: 'Ponte' },
+  { value: 'interlude', label: 'Interlúdio' },
+  { value: 'outro', label: 'Final' },
+  { value: 'tag', label: 'Tag' },
+];
+
+const LITURGICAL_OPTIONS: { value: LiturgicalTag; label: string }[] = [
   { value: 'introducao', label: 'Introdução' },
   { value: 'exaltacao', label: 'Exaltação' },
   { value: 'adoracao', label: 'Adoração' },
@@ -32,13 +59,201 @@ const liturgicalOptions: { value: LiturgicalTag; label: string }[] = [
   { value: 'apelo', label: 'Apelo' },
 ];
 
-type ImportStep = 'input' | 'preview' | 'metadata' | 'saved';
+type ImportStep = 'input' | 'edit' | 'metadata' | 'saved';
+
+const STEPS: ImportStep[] = ['input', 'edit', 'metadata', 'saved'];
+const STEP_LABELS: Record<ImportStep, string> = {
+  input: 'Cole o texto da cifra',
+  edit: 'Edite e reordene os blocos',
+  metadata: 'Preencha os metadados',
+  saved: 'Cifra salva com sucesso!',
+};
+
+// ── helpers ──────────────────────────────────────────────────
+
+function newId(): string {
+  return `blk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function newEmptyBlock(): ChordBlock {
+  return {
+    id: newId(),
+    type: 'verse',
+    label: 'Estrofe',
+    lines: [{ chords: '', lyrics: '' }],
+    directions: [],
+    repeatCount: 1,
+  };
+}
+
+function parseWithSeparators(rawText: string): {
+  blocks: ChordBlock[];
+  detectedKey?: string;
+  rawTitle?: string;
+  rawArtist?: string;
+} {
+  // Split on lines containing only "---"
+  const segments = rawText.split(/^\s*-{3,}\s*$/m).filter((s) => s.trim());
+  if (segments.length === 0) return { blocks: [] };
+
+  const firstResult = parseCifra(segments[0]);
+  const allBlocks: ChordBlock[] = [];
+
+  for (const segment of segments) {
+    const result = parseCifra(segment);
+    for (const block of result.blocks) {
+      allBlocks.push({ ...block, id: newId() });
+    }
+  }
+
+  if (allBlocks.length === 0) allBlocks.push(newEmptyBlock());
+
+  return {
+    blocks: allBlocks,
+    detectedKey: firstResult.detectedKey,
+    rawTitle: firstResult.rawTitle,
+    rawArtist: firstResult.rawArtist,
+  };
+}
+
+// ── SortableBlockCard ─────────────────────────────────────────
+
+interface BlockCardProps {
+  block: ChordBlock;
+  onChange: (b: ChordBlock) => void;
+  onDelete: () => void;
+  onDuplicate: () => void;
+}
+
+function SortableBlockCard({ block, onChange, onDelete, onDuplicate }: BlockCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: block.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.45 : 1,
+  };
+
+  function updateLine(idx: number, field: keyof ChordLine, value: string) {
+    onChange({
+      ...block,
+      lines: block.lines.map((l, i) => (i === idx ? { ...l, [field]: value } : l)),
+    });
+  }
+
+  function deleteLine(idx: number) {
+    onChange({ ...block, lines: block.lines.filter((_, i) => i !== idx) });
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className="bg-card border border-border rounded-xl overflow-hidden">
+      {/* Block header row */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-elevated border-b border-border flex-wrap">
+        <button
+          {...attributes}
+          {...listeners}
+          className="touch-none cursor-grab text-subtle hover:text-muted p-0.5 shrink-0"
+          aria-label="Arrastar bloco"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+
+        <select
+          value={block.type}
+          onChange={(e) => onChange({ ...block, type: e.target.value as BlockType })}
+          className="px-2 py-1 bg-card border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50 cursor-pointer"
+        >
+          {BLOCK_TYPE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+
+        <input
+          value={block.label}
+          onChange={(e) => onChange({ ...block, label: e.target.value })}
+          placeholder="Rótulo"
+          className="flex-1 min-w-0 px-2 py-1 bg-card border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50"
+        />
+
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[10px] text-subtle">×</span>
+          <input
+            type="number"
+            min={1}
+            max={10}
+            value={block.repeatCount}
+            onChange={(e) => onChange({ ...block, repeatCount: parseInt(e.target.value) || 1 })}
+            className="w-10 px-1.5 py-1 bg-card border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50 text-center"
+          />
+        </div>
+
+        <button
+          onClick={onDuplicate}
+          className="p-1 text-subtle hover:text-accent transition-colors cursor-pointer shrink-0"
+          title="Duplicar bloco"
+        >
+          <Copy className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={onDelete}
+          className="p-1 text-subtle hover:text-danger transition-colors cursor-pointer shrink-0"
+          title="Excluir bloco"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Lines */}
+      <div className="p-3 space-y-2">
+        {block.lines.map((line, i) => (
+          <div key={i} className="flex gap-2 items-start">
+            <div className="flex-1 space-y-1 min-w-0">
+              <input
+                value={line.chords}
+                onChange={(e) => updateLine(i, 'chords', e.target.value)}
+                placeholder="Acordes: Em  G  D  A"
+                className="w-full px-2 py-1.5 bg-elevated border border-border rounded text-xs text-foreground font-mono placeholder:text-subtle focus:outline-none focus:border-accent/50"
+              />
+              <input
+                value={line.lyrics}
+                onChange={(e) => updateLine(i, 'lyrics', e.target.value)}
+                placeholder="Letra..."
+                className="w-full px-2 py-1.5 bg-elevated border border-border rounded text-xs text-foreground placeholder:text-subtle focus:outline-none focus:border-accent/50"
+              />
+            </div>
+            <button
+              onClick={() => deleteLine(i)}
+              className="p-1 text-subtle hover:text-danger transition-colors cursor-pointer mt-1.5 shrink-0"
+              title="Excluir linha"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+
+        <button
+          onClick={() => onChange({ ...block, lines: [...block.lines, { chords: '', lyrics: '' }] })}
+          className="flex items-center gap-1.5 text-[11px] text-accent hover:text-accent/80 font-medium cursor-pointer transition-colors mt-1"
+        >
+          <Plus className="w-3 h-3" />
+          Adicionar Linha
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────
 
 export default function ImportarPage() {
   const [step, setStep] = useState<ImportStep>('input');
   const [rawText, setRawText] = useState('');
   const [cifraUrl, setCifraUrl] = useState('');
-  const [parseResult, setParseResult] = useState<ParseResult | null>(null);
+  const [editBlocks, setEditBlocks] = useState<ChordBlock[]>([]);
 
   // Metadata
   const [title, setTitle] = useState('');
@@ -49,35 +264,58 @@ export default function ImportarPage() {
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [selectedTags, setSelectedTags] = useState<LiturgicalTag[]>([]);
 
-  // Preview controls
-  const [viewMode, setViewMode] = useState<ViewMode>('chords_and_lyrics');
-  const [fontSize, setFontSize] = useState<FontSizePreset>('md');
-  const [transpose, setTranspose] = useState(0);
-
   const [saving, setSaving] = useState(false);
 
-  const handleParse = () => {
+  // DnD
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  const handleParse = useCallback(() => {
     if (!rawText.trim()) return;
-    const result = parseCifra(rawText);
-    setParseResult(result);
+    const { blocks, detectedKey, rawTitle, rawArtist } = parseWithSeparators(rawText);
+    setEditBlocks(blocks);
+    if (rawTitle) setTitle(rawTitle);
+    if (rawArtist) setArtists(rawArtist);
+    if (detectedKey) setKey(detectedKey);
+    setStep('edit');
+  }, [rawText]);
 
-    // Auto-fill metadata from parser
-    if (result.rawTitle) setTitle(result.rawTitle);
-    if (result.rawArtist) setArtists(result.rawArtist);
-    if (result.detectedKey) setKey(result.detectedKey);
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setEditBlocks((prev) => {
+        const oldIdx = prev.findIndex((b) => b.id === active.id);
+        const newIdx = prev.findIndex((b) => b.id === over.id);
+        return arrayMove(prev, oldIdx, newIdx);
+      });
+    }
+  }
 
-    setStep('preview');
-  };
+  function updateBlock(id: string, updated: ChordBlock) {
+    setEditBlocks((prev) => prev.map((b) => (b.id === id ? updated : b)));
+  }
+
+  function deleteBlock(id: string) {
+    setEditBlocks((prev) => prev.filter((b) => b.id !== id));
+  }
+
+  function duplicateBlock(id: string) {
+    setEditBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === id);
+      if (idx === -1) return prev;
+      const copy = { ...prev[idx], id: newId() };
+      const next = [...prev];
+      next.splice(idx + 1, 0, copy);
+      return next;
+    });
+  }
 
   const handleSave = async () => {
-    if (!parseResult || !title.trim() || saving) return;
-
+    if (!title.trim() || saving || editBlocks.length === 0) return;
     setSaving(true);
     try {
       const { insertSong } = await import('@/lib/data');
 
-      // Build searchable lyrics from all block lines
-      const searchableLyrics = parseResult.blocks
+      const searchableLyrics = editBlocks
         .flatMap((b) => b.lines.map((l) => l.lyrics))
         .filter(Boolean)
         .join(' ')
@@ -105,9 +343,9 @@ export default function ImportarPage() {
               .split(',')
               .map((a) => a.trim())
               .filter(Boolean),
-            key: (key || parseResult.detectedKey || 'C') as import('@/types').MusicalKey,
+            key: (key || 'C') as import('@/types').MusicalKey,
             bpm: parseInt(bpm) || 0,
-            blocks: parseResult.blocks,
+            blocks: editBlocks,
             youtubeUrl: youtubeUrl || undefined,
             sourceUrl: cifraUrl || undefined,
             isDefault: true,
@@ -131,11 +369,12 @@ export default function ImportarPage() {
     }
   };
 
-  const toggleTag = (tag: LiturgicalTag) => {
+  const toggleTag = (tag: LiturgicalTag) =>
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
-  };
+
+  const currentStepIdx = STEPS.indexOf(step);
 
   return (
     <div className="min-h-screen">
@@ -150,36 +389,31 @@ export default function ImportarPage() {
               <Upload className="w-5 h-5 text-accent" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground tracking-tight">
-                Importar Cifra
-              </h1>
-              <p className="text-xs text-muted">
-                {step === 'input' && 'Cole o texto da cifra'}
-                {step === 'preview' && 'Visualize os blocos detectados'}
-                {step === 'metadata' && 'Preencha os metadados'}
-                {step === 'saved' && 'Cifra salva com sucesso!'}
-              </p>
+              <h1 className="text-xl font-bold text-foreground tracking-tight">Importar Cifra</h1>
+              <p className="text-xs text-muted">{STEP_LABELS[step]}</p>
             </div>
           </div>
         </div>
 
         {/* Step indicator */}
         <div className="flex items-center gap-2 mb-4">
-          {(['input', 'preview', 'metadata', 'saved'] as const).map((s, i) => (
+          {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-2">
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
                   step === s
                     ? 'bg-accent text-white'
-                    : ['input', 'preview', 'metadata', 'saved'].indexOf(step) > i
+                    : currentStepIdx > i
                       ? 'bg-success/20 text-success'
                       : 'bg-elevated text-subtle'
                 }`}
               >
-                {['input', 'preview', 'metadata', 'saved'].indexOf(step) > i ? '✓' : i + 1}
+                {currentStepIdx > i ? '✓' : i + 1}
               </div>
-              {i < 3 && (
-                <div className={`w-8 h-0.5 ${['input', 'preview', 'metadata', 'saved'].indexOf(step) > i ? 'bg-success/40' : 'bg-border'}`} />
+              {i < STEPS.length - 1 && (
+                <div
+                  className={`w-8 h-0.5 ${currentStepIdx > i ? 'bg-success/40' : 'bg-border'}`}
+                />
               )}
             </div>
           ))}
@@ -187,10 +421,9 @@ export default function ImportarPage() {
       </div>
 
       <div className="px-5 md:px-8 pb-12">
-        {/* Step 1: Input */}
+        {/* ── Step 1: Input ── */}
         {step === 'input' && (
           <div className="space-y-4 animate-fade-in">
-            {/* URL input (optional) */}
             <div className="bg-card border border-border rounded-xl p-4">
               <label className="flex items-center gap-2 text-xs font-semibold text-foreground mb-2">
                 <LinkIcon className="w-3.5 h-3.5 text-accent" />
@@ -208,7 +441,6 @@ export default function ImportarPage() {
               </p>
             </div>
 
-            {/* Text input */}
             <div className="bg-card border border-border rounded-xl p-4">
               <label className="flex items-center gap-2 text-xs font-semibold text-foreground mb-2">
                 <FileText className="w-3.5 h-3.5 text-accent" />
@@ -217,10 +449,13 @@ export default function ImportarPage() {
               <textarea
                 value={rawText}
                 onChange={(e) => setRawText(e.target.value)}
-                placeholder={`Cole a cifra aqui. O parser detecta automaticamente blocos como:\n\n[Intro]\nEm  G  D  A\n\n[Estrofe 1]\n  Em           G\nSobre firme fundamento\n  D              A\nEu ponho os meus pés\n\n[Refrão]\n  C           G\nCristo é a rocha eterna...`}
+                placeholder={`Cole a cifra aqui. Use "---" em uma linha para forçar a separação entre blocos.\n\n[Intro]\nEm  G  D  A\n\n[Estrofe 1]\n  Em           G\nSobre firme fundamento\n\n---\n\n[Refrão]\n  C           G\nCristo é a rocha eterna...`}
                 rows={16}
                 className="w-full px-3 py-2.5 bg-elevated border border-border rounded-lg text-sm text-foreground placeholder:text-subtle focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all font-mono resize-y"
               />
+              <p className="text-[10px] text-subtle mt-1">
+                Dica: use <code className="bg-elevated px-1 rounded">---</code> em uma linha para forçar separação de blocos.
+              </p>
             </div>
 
             <button
@@ -228,59 +463,46 @@ export default function ImportarPage() {
               disabled={!rawText.trim()}
               className="w-full py-3 rounded-xl bg-accent text-white font-semibold text-sm hover:bg-accent/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              <Eye className="w-4 h-4" />
-              Visualizar Blocos
+              Editar Blocos →
             </button>
           </div>
         )}
 
-        {/* Step 2: Preview */}
-        {step === 'preview' && parseResult && (
+        {/* ── Step 2: Block Editor ── */}
+        {step === 'edit' && (
           <div className="space-y-4 animate-fade-in">
-            {/* Stats */}
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-widest text-accent">
-                {parseResult.blocks.length} blocos detectados
+                {editBlocks.length} bloco{editBlocks.length !== 1 ? 's' : ''}
               </span>
-              {parseResult.detectedKey && (
-                <span className="text-[10px] font-semibold text-success bg-success/10 px-2 py-0.5 rounded-md">
-                  Tom: {parseResult.detectedKey}
-                </span>
-              )}
-              {parseResult.rawTitle && (
-                <span className="text-[10px] text-muted truncate max-w-48">
-                  Título: {parseResult.rawTitle}
-                </span>
-              )}
+              <span className="text-[10px] text-subtle">Arraste para reordenar</span>
             </div>
 
-            {/* Toolbar */}
-            <ChordToolbar
-              songTitle={parseResult.rawTitle || 'Preview'}
-              currentKey={parseResult.detectedKey || 'C'}
-              bpm={72}
-              transposeSemitones={transpose}
-              onTransposeChange={setTranspose}
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              fontSize={fontSize}
-              onFontSizeChange={setFontSize}
-            />
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={editBlocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-3">
+                  {editBlocks.map((block) => (
+                    <SortableBlockCard
+                      key={block.id}
+                      block={block}
+                      onChange={(updated) => updateBlock(block.id, updated)}
+                      onDelete={() => deleteBlock(block.id)}
+                      onDuplicate={() => duplicateBlock(block.id)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
 
-            {/* Block preview */}
-            <div className="space-y-3">
-              {parseResult.blocks.map((block) => (
-                <ChordBlockView
-                  key={block.id}
-                  block={block}
-                  transposeSemitones={transpose}
-                  viewMode={viewMode}
-                  fontSize={fontSize}
-                />
-              ))}
-            </div>
+            <button
+              onClick={() => setEditBlocks((prev) => [...prev, newEmptyBlock()])}
+              className="w-full py-2.5 rounded-xl border border-dashed border-accent/40 text-accent text-sm font-medium hover:bg-accent/5 transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Adicionar Bloco
+            </button>
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setStep('input')}
                 className="flex-1 py-3 rounded-xl bg-elevated text-foreground font-semibold text-sm hover:bg-border transition-all cursor-pointer"
@@ -289,7 +511,8 @@ export default function ImportarPage() {
               </button>
               <button
                 onClick={() => setStep('metadata')}
-                className="flex-1 py-3 rounded-xl bg-accent text-white font-semibold text-sm hover:bg-accent/90 transition-all cursor-pointer flex items-center justify-center gap-2"
+                disabled={editBlocks.length === 0}
+                className="flex-1 py-3 rounded-xl bg-accent text-white font-semibold text-sm hover:bg-accent/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
               >
                 Preencher Metadados →
               </button>
@@ -297,15 +520,16 @@ export default function ImportarPage() {
           </div>
         )}
 
-        {/* Step 3: Metadata */}
+        {/* ── Step 3: Metadata ── */}
         {step === 'metadata' && (
           <div className="space-y-4 animate-fade-in">
             <div className="bg-card border border-border rounded-xl p-4 space-y-3">
               <h2 className="text-sm font-bold text-foreground">Informações da Música</h2>
 
-              {/* Title */}
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">Título *</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">
+                  Título *
+                </label>
                 <input
                   type="text"
                   value={title}
@@ -314,9 +538,10 @@ export default function ImportarPage() {
                 />
               </div>
 
-              {/* Artists */}
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">Artista(s) (separados por vírgula)</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">
+                  Artista(s) (separados por vírgula)
+                </label>
                 <input
                   type="text"
                   value={artists}
@@ -326,10 +551,11 @@ export default function ImportarPage() {
                 />
               </div>
 
-              {/* Nature + Key + BPM row */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">Tipo</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">
+                    Tipo
+                  </label>
                   <select
                     value={nature}
                     onChange={(e) => setNature(e.target.value as SongNature)}
@@ -340,7 +566,9 @@ export default function ImportarPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">Tom</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">
+                    Tom
+                  </label>
                   <input
                     type="text"
                     value={key}
@@ -350,7 +578,9 @@ export default function ImportarPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">BPM</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">
+                    BPM
+                  </label>
                   <input
                     type="number"
                     value={bpm}
@@ -361,9 +591,10 @@ export default function ImportarPage() {
                 </div>
               </div>
 
-              {/* YouTube */}
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">YouTube (opcional)</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">
+                  YouTube (opcional)
+                </label>
                 <input
                   type="url"
                   value={youtubeUrl}
@@ -374,14 +605,13 @@ export default function ImportarPage() {
               </div>
             </div>
 
-            {/* Liturgical Tags */}
             <div className="bg-card border border-border rounded-xl p-4">
               <h2 className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
                 <Tag className="w-4 h-4 text-accent" />
                 Momentos Litúrgicos
               </h2>
               <div className="flex flex-wrap gap-2">
-                {liturgicalOptions.map((opt) => (
+                {LITURGICAL_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     onClick={() => toggleTag(opt.value)}
@@ -399,7 +629,7 @@ export default function ImportarPage() {
 
             <div className="flex gap-3">
               <button
-                onClick={() => setStep('preview')}
+                onClick={() => setStep('edit')}
                 className="flex-1 py-3 rounded-xl bg-elevated text-foreground font-semibold text-sm hover:bg-border transition-all cursor-pointer"
               >
                 ← Voltar
@@ -425,7 +655,7 @@ export default function ImportarPage() {
           </div>
         )}
 
-        {/* Step 4: Saved */}
+        {/* ── Step 4: Saved ── */}
         {step === 'saved' && (
           <div className="text-center py-12 animate-fade-in">
             <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
@@ -440,7 +670,8 @@ export default function ImportarPage() {
                 onClick={() => {
                   setStep('input');
                   setRawText('');
-                  setParseResult(null);
+                  setCifraUrl('');
+                  setEditBlocks([]);
                   setTitle('');
                   setArtists('');
                   setKey('');
