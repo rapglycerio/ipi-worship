@@ -30,6 +30,7 @@ import {
   Trash2,
   Clock,
   LayoutList,
+  Lightbulb,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -470,6 +471,9 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggested, setSuggested] = useState(false);
   const [showEditSong, setShowEditSong] = useState(false);
   const [showEditBlocks, setShowEditBlocks] = useState(false);
   const [editBlocks, setEditBlocks] = useState<ChordBlock[]>([]);
@@ -588,6 +592,25 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
     }
   };
 
+  const handleSuggest = async () => {
+    if (!user || suggesting) return;
+    setSuggesting(true);
+    try {
+      const { addSuggestion } = await import('@/lib/data');
+      await addSuggestion({
+        masterSongId: song!.id,
+        email: user.email!,
+        name: user.name || user.email!,
+      });
+      setSuggested(true);
+      setShowSuggest(false);
+    } catch {
+      alert('Erro ao sugerir. Tente novamente.');
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
   const handleOpenEditBlocks = () => {
     setEditBlocks(activeVersion.blocks.map((b) => ({ ...b })));
     setShowEditBlocks(true);
@@ -631,6 +654,41 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
             loadSong();
           }}
         />
+      )}
+
+      {/* Suggest modal */}
+      {showSuggest && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowSuggest(false)}>
+          <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+                <Lightbulb className="w-5 h-5 text-accent" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-foreground">Sugerir Música</h2>
+                <p className="text-xs text-muted">para a próxima playlist</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted mb-4">
+              Sugerir <strong className="text-foreground">{song?.title}</strong> como sugestão para a próxima playlist?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowSuggest(false)}
+                className="flex-1 py-2.5 rounded-xl bg-elevated text-foreground font-semibold text-sm hover:bg-border cursor-pointer transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSuggest}
+                disabled={suggesting}
+                className="flex-1 py-2.5 rounded-xl bg-accent text-white font-semibold text-sm hover:bg-accent/90 disabled:opacity-40 cursor-pointer transition-all flex items-center justify-center gap-2"
+              >
+                {suggesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Lightbulb className="w-4 h-4" /> Sugerir</>}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Edit Blocks fullscreen */}
@@ -728,14 +786,29 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
               {/* Action buttons */}
               <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
                 {isLoggedIn && (
-                  <button
-                    onClick={() => setShowAddToPlaylist(true)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-semibold hover:bg-accent hover:text-white transition-all cursor-pointer"
-                    title="Adicionar à playlist"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Playlist
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setShowAddToPlaylist(true)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-semibold hover:bg-accent hover:text-white transition-all cursor-pointer"
+                      title="Adicionar à playlist"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Playlist
+                    </button>
+                    <button
+                      onClick={() => suggested ? undefined : setShowSuggest(true)}
+                      disabled={suggested}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        suggested
+                          ? 'bg-success/10 text-success cursor-default'
+                          : 'bg-elevated text-muted hover:bg-border'
+                      }`}
+                      title="Sugerir para próxima playlist"
+                    >
+                      <Lightbulb className="w-3.5 h-3.5" />
+                      {suggested ? 'Sugerida!' : 'Sugerir'}
+                    </button>
+                  </>
                 )}
                 {isAdmin && (
                   <>

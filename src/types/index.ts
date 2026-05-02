@@ -3,6 +3,19 @@
 // Master/Child versioning + Modular blocks
 // ============================================
 
+/** A pending song suggestion for the next playlist */
+export interface SongSuggestion {
+  id: string;
+  masterSongId: string;
+  suggestedByEmail: string;
+  suggestedByName: string;
+  message?: string;
+  createdAt: string;
+  // joined from master_songs
+  songTitle?: string;
+  songNature?: string;
+}
+
 /** Stage direction annotations for blocks */
 export type StageDirection =
   | 'a_capella'

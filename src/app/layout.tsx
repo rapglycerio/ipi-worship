@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import AuthProvider from "@/components/AuthProvider";
+import InstallBanner from "@/components/InstallBanner";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -38,9 +39,10 @@ export default function RootLayout({
         <AuthProvider>
           <Sidebar />
           {/* Main Content */}
-          <main className="flex-1 md:ml-[280px] pt-14 pb-16 md:pt-0 md:pb-0 min-h-screen">
+          <main className="flex-1 md:ml-[280px] pb-16 md:pb-0 min-h-screen">
             {children}
           </main>
+          <InstallBanner />
         </AuthProvider>
       </body>
     </html>

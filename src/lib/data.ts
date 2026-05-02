@@ -412,6 +412,49 @@ export async function updateVersionMetadata(
   return true;
 }
 
+// === SUGGESTIONS ===
+
+export async function fetchSuggestions(): Promise<import('@/types').SongSuggestion[]> {
+  const { data, error } = await supabase
+    .from('song_suggestions')
+    .select('*, master_songs(id, title, nature)')
+    .order('created_at', { ascending: false });
+
+  if (error || !data) return [];
+  return data.map((row: any) => ({
+    id: row.id,
+    masterSongId: row.master_song_id,
+    suggestedByEmail: row.suggested_by_email,
+    suggestedByName: row.suggested_by_name,
+    message: row.message || undefined,
+    createdAt: row.created_at,
+    songTitle: row.master_songs?.title,
+    songNature: row.master_songs?.nature,
+  }));
+}
+
+export async function addSuggestion(data: {
+  masterSongId: string;
+  email: string;
+  name: string;
+  message?: string;
+}): Promise<boolean> {
+  const { error } = await supabase.from('song_suggestions').insert({
+    master_song_id: data.masterSongId,
+    suggested_by_email: data.email,
+    suggested_by_name: data.name,
+    message: data.message || null,
+  });
+  if (error) { console.error('Error adding suggestion:', error); return false; }
+  return true;
+}
+
+export async function removeSuggestion(id: string): Promise<boolean> {
+  const { error } = await supabase.from('song_suggestions').delete().eq('id', id);
+  if (error) { console.error('Error removing suggestion:', error); return false; }
+  return true;
+}
+
 // === AUTH HELPERS ===
 
 export async function getUserRole(email: string): Promise<string | null> {

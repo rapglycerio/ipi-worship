@@ -202,66 +202,56 @@ export function ChordToolbar({
       </div>
 
       <div className="flex items-center gap-1 flex-wrap">
-        {/* Transpose */}
-        <div className="flex items-center gap-0.5 bg-elevated rounded-lg px-1 shrink-0">
+        {/* Transpose — shows transposed key directly */}
+        <div className="flex items-center bg-elevated rounded-lg shrink-0">
           <button
             onClick={() => onTransposeChange(transposeSemitones - 1)}
-            className="touch-target text-xs font-bold text-muted"
+            className="touch-target text-sm font-bold text-muted px-2"
             aria-label="Diminuir tom"
-          >
-            −
-          </button>
-          <span className="text-[10px] font-semibold text-foreground w-8 text-center">Tom</span>
+          >−</button>
+          <span className="text-xs font-mono font-bold text-accent w-8 text-center select-none">
+            {transposedKey}
+          </span>
           <button
             onClick={() => onTransposeChange(transposeSemitones + 1)}
-            className="touch-target text-xs font-bold text-muted"
+            className="touch-target text-sm font-bold text-muted px-2"
             aria-label="Aumentar tom"
-          >
-            +
-          </button>
+          >+</button>
         </div>
 
         {/* Reset transpose */}
         {transposeSemitones !== 0 && (
           <button
             onClick={() => onTransposeChange(0)}
-            className="px-2 h-9 text-[10px] font-semibold bg-elevated rounded-lg text-muted hover:bg-border shrink-0 cursor-pointer transition-colors"
-          >
-            Reset
-          </button>
+            className="h-9 px-2 text-[10px] font-semibold bg-elevated rounded-lg text-muted hover:bg-border shrink-0 cursor-pointer transition-colors"
+            title="Resetar transposição"
+          >↺</button>
         )}
 
         {/* Font Size */}
-        <div className="flex items-center gap-0.5 bg-elevated rounded-lg px-1 shrink-0">
+        <div className="flex items-center bg-elevated rounded-lg shrink-0">
           <button
             onClick={() => { if (currentFontIndex > 0) onFontSizeChange(fontSizes[currentFontIndex - 1]); }}
-            className="touch-target text-muted"
-            aria-label="Diminuir fonte"
-          >
-            <Type className="w-3 h-3" />
-          </button>
-          <span className="text-[10px] font-semibold text-foreground w-6 text-center">{fontSize.toUpperCase()}</span>
+            className="touch-target text-muted px-1.5" aria-label="Diminuir fonte"
+          ><Type className="w-3 h-3" /></button>
+          <span className="text-[10px] font-semibold text-foreground w-5 text-center select-none">{fontSize.toUpperCase()}</span>
           <button
             onClick={() => { if (currentFontIndex < fontSizes.length - 1) onFontSizeChange(fontSizes[currentFontIndex + 1]); }}
-            className="touch-target text-muted"
-            aria-label="Aumentar fonte"
-          >
-            <Type className="w-4 h-4" />
-          </button>
+            className="touch-target text-muted px-1.5" aria-label="Aumentar fonte"
+          ><Type className="w-4 h-4" /></button>
         </div>
 
-        {/* View Mode Toggle — only 2 modes */}
+        {/* View Mode — icon + label, label hidden on small screens */}
         <button
           onClick={() => onViewModeChange(isLyricsOnly ? 'chords_and_lyrics' : 'lyrics_only')}
-          className="flex items-center gap-1.5 bg-elevated rounded-lg px-3 h-9 text-[10px] font-semibold text-foreground shrink-0 cursor-pointer hover:bg-border transition-colors"
-          aria-label="Alternar modo de visualização"
+          className="flex items-center gap-1.5 bg-elevated rounded-lg px-2.5 h-9 text-[10px] font-semibold text-foreground shrink-0 cursor-pointer hover:bg-border transition-colors"
+          aria-label={isLyricsOnly ? 'Mostrar cifra e letra' : 'Mostrar só letra'}
+          title={isLyricsOnly ? 'Cifra + Letra' : 'Só Letra'}
         >
-          {isLyricsOnly ? (
-            <EyeOff className="w-3.5 h-3.5 text-muted" />
-          ) : (
-            <Eye className="w-3.5 h-3.5 text-accent" />
-          )}
-          {isLyricsOnly ? 'Só Letra' : 'Cifra + Letra'}
+          {isLyricsOnly
+            ? <EyeOff className="w-3.5 h-3.5 text-muted" />
+            : <Eye    className="w-3.5 h-3.5 text-accent" />}
+          <span className="hidden sm:inline">{isLyricsOnly ? 'Só Letra' : 'Cifra + Letra'}</span>
         </button>
       </div>
     </div>

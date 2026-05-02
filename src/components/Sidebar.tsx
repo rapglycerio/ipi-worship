@@ -73,37 +73,6 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* ── Mobile top bar ── */}
-      <header className="fixed top-0 left-0 right-0 z-50 glass-strong flex items-center justify-between px-4 h-14 md:hidden no-print">
-        <button
-          onClick={() => setIsOpen(true)}
-          className="min-w-[44px] min-h-[44px] flex items-center justify-center"
-          aria-label="Abrir menu"
-        >
-          <Menu className="w-6 h-6 text-foreground" />
-        </button>
-
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center">
-            <Music className="w-4 h-4 text-white" />
-          </div>
-          <span className="text-sm font-semibold text-foreground tracking-tight">IPI Imirim</span>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <Link href="/busca" className="min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Buscar">
-            <Search className="w-5 h-5 text-muted" />
-          </Link>
-          <button
-            onClick={toggleTheme}
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center"
-            aria-label="Alternar tema"
-          >
-            {isDark ? <Sun className="w-5 h-5 text-muted" /> : <Moon className="w-5 h-5 text-muted" />}
-          </button>
-        </div>
-      </header>
-
       {/* ── Mobile overlay ── */}
       {isOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 md:hidden" onClick={() => setIsOpen(false)} />
