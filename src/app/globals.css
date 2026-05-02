@@ -353,6 +353,13 @@ body {
   }
 }
 
+/* --- SIDEBAR COLLAPSED (desktop) --- */
+@media (min-width: 768px) {
+  html[data-sidebar="collapsed"] main {
+    margin-left: 0 !important;
+  }
+}
+
 /* --- PRINT MODE (for chord sheets) --- */
 @media print {
   body {

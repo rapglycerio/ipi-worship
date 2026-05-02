@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession, signIn, signOut } from 'next-auth/react';
 import {
   Music,
   ListMusic,
@@ -15,6 +16,10 @@ import {
   ClipboardCheck,
   Library,
   Upload,
+  LogIn,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 const navItems = [
@@ -26,15 +31,39 @@ const navItems = [
   { href: '/importar', label: 'Importar Cifra', icon: Upload },
 ];
 
+const COLLAPSED_KEY = 'sidebar_collapsed';
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
   const [isOpen, setIsOpen] = useState(false);
-  const [isDark, setIsDark] = useState(true); // Dark mode default for musicians
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isDark, setIsDark] = useState(true);
+
+  // Load collapsed preference from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(COLLAPSED_KEY);
+    if (saved === 'true') {
+      setIsCollapsed(true);
+      document.documentElement.dataset.sidebar = 'collapsed';
+    }
+  }, []);
+
+  const toggleCollapsed = () => {
+    const next = !isCollapsed;
+    setIsCollapsed(next);
+    localStorage.setItem(COLLAPSED_KEY, String(next));
+    document.documentElement.dataset.sidebar = next ? 'collapsed' : 'open';
+  };
 
   const toggleTheme = () => {
     setIsDark(!isDark);
     document.documentElement.classList.toggle('dark');
   };
+
+  const user = session?.user;
+  const userRole = (user as { role?: string } | undefined)?.role;
+  const isAdmin = userRole === 'admin';
 
   return (
     <>
@@ -92,6 +121,7 @@ export default function Sidebar() {
           transition-transform duration-300 ease-out
           md:translate-x-0
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+          ${isCollapsed ? 'md:-translate-x-full' : 'md:translate-x-0'}
           no-print
         `}
       >
@@ -108,12 +138,20 @@ export default function Sidebar() {
               <p className="text-[11px] text-muted mt-0.5">Louvor & Liturgia</p>
             </div>
           </div>
+          {/* Mobile close / Desktop collapse */}
           <button
-            onClick={() => setIsOpen(false)}
+            onClick={() => { setIsOpen(false); }}
             className="touch-target md:hidden"
             aria-label="Fechar menu"
           >
             <X className="w-5 h-5 text-muted" />
+          </button>
+          <button
+            onClick={toggleCollapsed}
+            className="hidden md:flex touch-target"
+            aria-label="Recolher sidebar"
+          >
+            <ChevronLeft className="w-5 h-5 text-muted hover:text-foreground transition-colors" />
           </button>
         </div>
 
@@ -153,7 +191,7 @@ export default function Sidebar() {
                       }
                     `}
                   >
-                    <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-accent' : ''}`} />
+                    <Icon className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-accent' : ''}`} />
                     {item.label}
                     {isActive && (
                       <div className="ml-auto w-1.5 h-1.5 rounded-full bg-accent animate-pulse-glow" />
@@ -165,8 +203,38 @@ export default function Sidebar() {
           </ul>
         </div>
 
-        {/* Footer */}
-        <div className="px-4 py-3 border-t border-border">
+        {/* Footer: Auth + Theme */}
+        <div className="px-4 py-3 border-t border-border space-y-1">
+          {user ? (
+            <div className="px-3 py-2.5 rounded-lg bg-elevated mb-1">
+              <p className="text-xs font-semibold text-foreground truncate">{user.name}</p>
+              <p className="text-[10px] text-subtle truncate">{user.email}</p>
+              {isAdmin && (
+                <span className="inline-block mt-1 text-[9px] font-bold uppercase tracking-wider text-accent bg-accent/10 px-1.5 py-0.5 rounded">
+                  Admin
+                </span>
+              )}
+            </div>
+          ) : null}
+
+          {user ? (
+            <button
+              onClick={() => signOut()}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm text-muted hover:bg-elevated hover:text-foreground transition-colors duration-200 cursor-pointer"
+            >
+              <LogOut className="w-[18px] h-[18px]" />
+              <span>Sair</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => signIn('google')}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm text-accent bg-accent/10 hover:bg-accent/20 transition-colors duration-200 cursor-pointer font-medium"
+            >
+              <LogIn className="w-[18px] h-[18px]" />
+              <span>Entrar com Google</span>
+            </button>
+          )}
+
           <button
             onClick={toggleTheme}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm text-muted hover:bg-elevated transition-colors duration-200 cursor-pointer"
@@ -185,6 +253,17 @@ export default function Sidebar() {
           </button>
         </div>
       </nav>
+
+      {/* Desktop re-open tab (visible only when collapsed) */}
+      {isCollapsed && (
+        <button
+          onClick={toggleCollapsed}
+          className="hidden md:flex fixed top-4 left-0 z-40 items-center justify-center w-7 h-10 bg-card border border-l-0 border-border rounded-r-lg shadow-md text-muted hover:text-accent transition-colors cursor-pointer no-print"
+          aria-label="Expandir sidebar"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      )}
     </>
   );
 }
