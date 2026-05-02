@@ -342,6 +342,42 @@ export async function updateSongMetadata(
   return true;
 }
 
+export async function updateVersionBlocks(
+  versionId: string,
+  blocks: import('@/types').ChordBlock[]
+): Promise<boolean> {
+  // Delete all existing blocks for this version
+  const { error: deleteError } = await supabase
+    .from('chord_blocks')
+    .delete()
+    .eq('version_id', versionId);
+
+  if (deleteError) {
+    console.error('Error deleting blocks:', deleteError);
+    return false;
+  }
+
+  // Re-insert in new order
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    const { error } = await supabase.from('chord_blocks').insert({
+      version_id: versionId,
+      type: block.type,
+      label: block.label,
+      sort_order: i,
+      repeat_count: block.repeatCount,
+      directions: JSON.stringify(block.directions),
+      lines: JSON.stringify(block.lines),
+    });
+    if (error) {
+      console.error('Error inserting block:', error);
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export async function updateVersionMetadata(
   versionId: string,
   data: {

@@ -4,8 +4,9 @@ import { use, useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { liturgicalTagLabels } from '@/data/mock-songs';
 import ChordBlockView, { ChordToolbar } from '@/components/ChordBlockView';
+import BlockEditor from '@/components/BlockEditor';
 import { useWakeLock } from '@/hooks/useWakeLock';
-import type { MasterSong, ViewMode, FontSizePreset, LiturgicalTag, SongNature, Playlist } from '@/types';
+import type { MasterSong, ViewMode, FontSizePreset, LiturgicalTag, SongNature, Playlist, ChordBlock } from '@/types';
 import {
   ArrowLeft,
   ExternalLink,
@@ -28,6 +29,7 @@ import {
   ListMusic,
   Trash2,
   Clock,
+  LayoutList,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -469,6 +471,9 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
   const [showVersions, setShowVersions] = useState(false);
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
   const [showEditSong, setShowEditSong] = useState(false);
+  const [showEditBlocks, setShowEditBlocks] = useState(false);
+  const [editBlocks, setEditBlocks] = useState<ChordBlock[]>([]);
+  const [savingBlocks, setSavingBlocks] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [lastPlayedDate, setLastPlayedDate] = useState<string | null>(null);
@@ -583,6 +588,30 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
     }
   };
 
+  const handleOpenEditBlocks = () => {
+    setEditBlocks(activeVersion.blocks.map((b) => ({ ...b })));
+    setShowEditBlocks(true);
+  };
+
+  const handleSaveBlocks = async () => {
+    if (savingBlocks) return;
+    setSavingBlocks(true);
+    try {
+      const { updateVersionBlocks } = await import('@/lib/data');
+      const ok = await updateVersionBlocks(activeVersion.id, editBlocks);
+      if (ok) {
+        setShowEditBlocks(false);
+        loadSong();
+      } else {
+        alert('Erro ao salvar blocos. Tente novamente.');
+      }
+    } catch {
+      alert('Erro ao salvar blocos. Verifique a conexão.');
+    } finally {
+      setSavingBlocks(false);
+    }
+  };
+
   return (
     <div className="min-h-screen pb-20">
       {/* Modals */}
@@ -602,6 +631,38 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
             loadSong();
           }}
         />
+      )}
+
+      {/* Edit Blocks fullscreen */}
+      {showEditBlocks && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-background">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
+            <div className="flex items-center gap-2">
+              <LayoutList className="w-4 h-4 text-accent" />
+              <span className="text-sm font-bold text-foreground">Editar Blocos</span>
+              <span className="text-xs text-subtle">— {song.title}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowEditBlocks(false)}
+                className="px-3 py-1.5 rounded-lg bg-elevated text-muted text-xs font-semibold hover:bg-border transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveBlocks}
+                disabled={savingBlocks}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent/90 disabled:opacity-40 transition-all cursor-pointer"
+              >
+                {savingBlocks ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                Salvar
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            <BlockEditor blocks={editBlocks} onChange={setEditBlocks} />
+          </div>
+        </div>
       )}
 
       {/* Delete confirm */}
@@ -681,10 +742,18 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
                     <button
                       onClick={() => setShowEditSong(true)}
                       className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-elevated text-muted text-xs font-semibold hover:bg-border transition-all cursor-pointer"
-                      title="Editar música"
+                      title="Editar metadados"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                       Editar
+                    </button>
+                    <button
+                      onClick={handleOpenEditBlocks}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-elevated text-muted text-xs font-semibold hover:bg-border transition-all cursor-pointer"
+                      title="Editar blocos"
+                    >
+                      <LayoutList className="w-3.5 h-3.5" />
+                      Blocos
                     </button>
                     <button
                       onClick={() => setShowDeleteConfirm(true)}
