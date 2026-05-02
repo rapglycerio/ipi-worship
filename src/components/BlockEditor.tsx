@@ -1,7 +1,7 @@
 'use client';
 
 import type { ChordBlock, ChordLine, BlockType } from '@/types';
-import { ChevronUp, ChevronDown, Plus, Trash2, Copy } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, Trash2, Copy, Repeat } from 'lucide-react';
 
 // ── helpers ──────────────────────────────────────────────────
 
@@ -21,25 +21,25 @@ export function newEmptyBlock(): ChordBlock {
 }
 
 export const BLOCK_TYPE_OPTIONS: { value: BlockType; label: string }[] = [
-  { value: 'intro', label: 'Intro' },
-  { value: 'verse', label: 'Estrofe' },
+  { value: 'intro',      label: 'Intro' },
+  { value: 'verse',      label: 'Estrofe' },
   { value: 'pre_chorus', label: 'Pré-Refrão' },
-  { value: 'chorus', label: 'Refrão' },
-  { value: 'bridge', label: 'Ponte' },
-  { value: 'interlude', label: 'Interlúdio' },
-  { value: 'outro', label: 'Final' },
-  { value: 'tag', label: 'Tag' },
+  { value: 'chorus',     label: 'Refrão' },
+  { value: 'bridge',     label: 'Ponte' },
+  { value: 'interlude',  label: 'Interlúdio' },
+  { value: 'outro',      label: 'Final' },
+  { value: 'tag',        label: 'Tag' },
 ];
 
-const BLOCK_ACCENT: Record<BlockType, string> = {
-  intro:      'border-l-info/60',
-  verse:      'border-l-accent/40',
-  pre_chorus: 'border-l-warning/50',
-  chorus:     'border-l-accent',
-  bridge:     'border-l-success/60',
-  interlude:  'border-l-subtle/60',
-  outro:      'border-l-muted/40',
-  tag:        'border-l-warning/40',
+const blockTypeStyles: Record<BlockType, string> = {
+  intro:      'block-intro',
+  verse:      'block-verse',
+  pre_chorus: 'block-verse',
+  chorus:     'block-chorus',
+  bridge:     'block-bridge',
+  interlude:  'block-intro',
+  outro:      'block-intro',
+  tag:        'block-verse',
 };
 
 // ── BlockCard ─────────────────────────────────────────────────
@@ -61,10 +61,7 @@ function BlockCard({
 }: BlockCardProps) {
 
   function updateLine(idx: number, field: keyof ChordLine, value: string) {
-    onChange({
-      ...block,
-      lines: block.lines.map((l, i) => (i === idx ? { ...l, [field]: value } : l)),
-    });
+    onChange({ ...block, lines: block.lines.map((l, i) => (i === idx ? { ...l, [field]: value } : l)) });
   }
 
   function deleteLine(idx: number) {
@@ -72,18 +69,53 @@ function BlockCard({
     onChange({ ...block, lines: block.lines.filter((_, i) => i !== idx) });
   }
 
-  const accent = BLOCK_ACCENT[block.type] ?? 'border-l-border';
+  const blockStyle = blockTypeStyles[block.type] ?? 'block-verse';
 
   return (
-    <div className={`bg-card border border-border border-l-4 ${accent} rounded-xl overflow-hidden`}>
-      {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-elevated border-b border-border flex-wrap">
-        {/* Move up/down */}
-        <div className="flex flex-col gap-0.5 shrink-0">
+    <div className={`${blockStyle} py-3 mb-3 relative group`}>
+      {/* Block header — same look as ChordBlockView */}
+      <div className="flex items-start justify-between mb-2 gap-2">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          {/* Editable label — styled as the accent header */}
+          <input
+            value={block.label}
+            onChange={(e) => onChange({ ...block, label: e.target.value })}
+            className="text-[11px] font-bold uppercase tracking-wider text-accent bg-transparent border-0 focus:outline-none focus:ring-0 p-0 min-w-0 w-auto"
+            style={{ width: `${Math.max(block.label.length, 4)}ch` }}
+          />
+
+          {/* Type selector — subtle */}
+          <select
+            value={block.type}
+            onChange={(e) => onChange({ ...block, type: e.target.value as BlockType })}
+            className="text-[10px] text-subtle bg-transparent border-0 focus:outline-none cursor-pointer p-0 -ml-1"
+          >
+            {BLOCK_TYPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+
+          {/* Repeat count */}
+          <div className="stage-pill flex items-center gap-1">
+            <Repeat className="w-3 h-3" />
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={block.repeatCount}
+              onChange={(e) => onChange({ ...block, repeatCount: parseInt(e.target.value) || 1 })}
+              className="w-5 bg-transparent border-0 focus:outline-none text-center p-0 text-[11px]"
+            />
+            <span className="text-[11px]">x</span>
+          </div>
+        </div>
+
+        {/* Actions — visible on hover */}
+        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={onMoveUp}
             disabled={isFirst}
-            className="p-0.5 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            className="p-1 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors cursor-pointer"
             title="Mover para cima"
           >
             <ChevronUp className="w-3.5 h-3.5" />
@@ -91,97 +123,59 @@ function BlockCard({
           <button
             onClick={onMoveDown}
             disabled={isLast}
-            className="p-0.5 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            className="p-1 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors cursor-pointer"
             title="Mover para baixo"
           >
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
+          <button onClick={onDuplicate} className="p-1 text-subtle hover:text-accent transition-colors cursor-pointer" title="Duplicar">
+            <Copy className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={onDelete} className="p-1 text-subtle hover:text-danger transition-colors cursor-pointer" title="Excluir bloco">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
-
-        <select
-          value={block.type}
-          onChange={(e) => onChange({ ...block, type: e.target.value as BlockType })}
-          className="px-2 py-1 bg-card border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50 cursor-pointer"
-        >
-          {BLOCK_TYPE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-
-        <input
-          value={block.label}
-          onChange={(e) => onChange({ ...block, label: e.target.value })}
-          placeholder="Rótulo"
-          className="flex-1 min-w-0 px-2 py-1 bg-card border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50"
-        />
-
-        <div className="flex items-center gap-1 shrink-0">
-          <span className="text-[10px] text-subtle">×</span>
-          <input
-            type="number"
-            min={1}
-            max={10}
-            value={block.repeatCount}
-            onChange={(e) => onChange({ ...block, repeatCount: parseInt(e.target.value) || 1 })}
-            className="w-9 px-1 py-1 bg-card border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50 text-center"
-          />
-        </div>
-
-        <button
-          onClick={onDuplicate}
-          className="p-1 text-subtle hover:text-accent transition-colors cursor-pointer shrink-0"
-          title="Duplicar bloco"
-        >
-          <Copy className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={onDelete}
-          className="p-1 text-subtle hover:text-danger transition-colors cursor-pointer shrink-0"
-          title="Excluir bloco"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
       </div>
 
-      {/* Lines — styled like chord view */}
-      <div className="p-3 space-y-3">
+      {/* Lines — chord + lyric inputs using the same CSS classes as ChordBlockView */}
+      <div className="space-y-0.5">
         {block.lines.map((line, i) => (
-          <div key={i} className="group relative">
-            {/* Chords row */}
+          <div key={i} className="group/line relative pr-6">
+            {/* Chords — same style as .chord-line */}
             <input
               value={line.chords}
               onChange={(e) => updateLine(i, 'chords', e.target.value)}
-              placeholder="Acordes: Em  G  D  A"
-              className="w-full px-0 py-0.5 bg-transparent border-b border-dashed border-accent/30 focus:border-accent/70 text-xs text-accent font-mono placeholder:text-subtle/50 focus:outline-none transition-colors"
+              placeholder="acordes..."
+              className="chord-line w-full bg-transparent border-0 focus:outline-none placeholder:opacity-30 focus:placeholder:opacity-50"
             />
-            {/* Lyrics row */}
-            <div className="flex items-end gap-2 mt-0.5">
-              <input
-                value={line.lyrics}
-                onChange={(e) => updateLine(i, 'lyrics', e.target.value)}
-                placeholder="Letra..."
-                className="flex-1 px-0 py-0.5 bg-transparent border-b border-dashed border-border focus:border-foreground/30 text-sm text-foreground placeholder:text-subtle/50 focus:outline-none transition-colors"
-              />
-              <button
-                onClick={() => deleteLine(i)}
-                disabled={block.lines.length <= 1}
-                className="shrink-0 mb-0.5 p-0.5 text-subtle/40 hover:text-danger disabled:opacity-0 transition-colors cursor-pointer"
-                title="Excluir linha"
-              >
-                <Trash2 className="w-3 h-3" />
-              </button>
-            </div>
+            {/* Lyrics — same style as .lyric-line */}
+            <input
+              value={line.lyrics}
+              onChange={(e) => updateLine(i, 'lyrics', e.target.value)}
+              placeholder="letra..."
+              className="lyric-line w-full bg-transparent border-0 focus:outline-none placeholder:text-subtle placeholder:opacity-50 focus:placeholder:opacity-80"
+            />
+            {/* Delete line — only on hover */}
+            <button
+              onClick={() => deleteLine(i)}
+              disabled={block.lines.length <= 1}
+              className="absolute right-0 top-1/2 -translate-y-1/2 p-0.5 text-subtle/0 group-hover/line:text-subtle/60 hover:!text-danger disabled:!opacity-0 transition-colors cursor-pointer"
+              title="Remover linha"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
           </div>
         ))}
-
-        <button
-          onClick={() => onChange({ ...block, lines: [...block.lines, { chords: '', lyrics: '' }] })}
-          className="flex items-center gap-1.5 text-[11px] text-accent/70 hover:text-accent font-medium cursor-pointer transition-colors mt-1"
-        >
-          <Plus className="w-3 h-3" />
-          Adicionar linha
-        </button>
       </div>
+
+      {/* Add line */}
+      <button
+        onClick={() => onChange({ ...block, lines: [...block.lines, { chords: '', lyrics: '' }] })}
+        className="mt-2 flex items-center gap-1 text-[11px] text-accent/50 hover:text-accent transition-colors cursor-pointer"
+      >
+        <Plus className="w-3 h-3" />
+        linha
+      </button>
     </div>
   );
 }
@@ -194,6 +188,7 @@ interface BlockEditorProps {
 }
 
 export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
+
   function updateBlock(id: string, updated: ChordBlock) {
     onChange(blocks.map((b) => (b.id === id ? updated : b)));
   }
@@ -222,32 +217,28 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-accent">
-          {blocks.length} bloco{blocks.length !== 1 ? 's' : ''}
-        </span>
-      </div>
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-accent mb-3">
+        {blocks.length} bloco{blocks.length !== 1 ? 's' : ''} — passe o mouse para ver as ações
+      </p>
 
-      <div className="space-y-3">
-        {blocks.map((block, i) => (
-          <BlockCard
-            key={block.id}
-            block={block}
-            isFirst={i === 0}
-            isLast={i === blocks.length - 1}
-            onChange={(updated) => updateBlock(block.id, updated)}
-            onDelete={() => deleteBlock(block.id)}
-            onDuplicate={() => duplicateBlock(block.id)}
-            onMoveUp={() => moveBlock(block.id, 'up')}
-            onMoveDown={() => moveBlock(block.id, 'down')}
-          />
-        ))}
-      </div>
+      {blocks.map((block, i) => (
+        <BlockCard
+          key={block.id}
+          block={block}
+          isFirst={i === 0}
+          isLast={i === blocks.length - 1}
+          onChange={(updated) => updateBlock(block.id, updated)}
+          onDelete={() => deleteBlock(block.id)}
+          onDuplicate={() => duplicateBlock(block.id)}
+          onMoveUp={() => moveBlock(block.id, 'up')}
+          onMoveDown={() => moveBlock(block.id, 'down')}
+        />
+      ))}
 
       <button
         onClick={() => onChange([...blocks, newEmptyBlock()])}
-        className="w-full py-2.5 rounded-xl border border-dashed border-accent/40 text-accent text-sm font-medium hover:bg-accent/5 transition-all cursor-pointer flex items-center justify-center gap-2"
+        className="w-full py-2.5 rounded-xl border border-dashed border-accent/40 text-accent text-sm font-medium hover:bg-accent/5 transition-all cursor-pointer flex items-center justify-center gap-2 mt-1"
       >
         <Plus className="w-4 h-4" />
         Adicionar Bloco

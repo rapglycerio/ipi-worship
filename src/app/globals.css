@@ -353,10 +353,10 @@ body {
   }
 }
 
-/* --- SIDEBAR COLLAPSED (desktop) --- */
+/* --- SIDEBAR COLLAPSED (icon-only, 56px) --- */
 @media (min-width: 768px) {
   html[data-sidebar="collapsed"] main {
-    margin-left: 0 !important;
+    margin-left: 56px !important;
   }
 }
 
