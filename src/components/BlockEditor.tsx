@@ -67,16 +67,21 @@ interface DirectionsEditorProps {
 }
 
 function DirectionsEditor({ directions, onChange }: DirectionsEditorProps) {
-  const [addingType, setAddingType] = useState<StageDirection>('crescendo');
-  const [addingLabel, setAddingLabel] = useState('');
-  const [showAdd, setShowAdd] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [customLabel, setCustomLabel] = useState('');
 
-  function addDirection() {
-    const opt = DIRECTION_OPTIONS.find((o) => o.value === addingType);
-    const label = addingLabel.trim() || opt?.label || addingType;
-    onChange([...directions, { type: addingType, label }]);
-    setAddingLabel('');
-    setShowAdd(false);
+  function addDirection(type: StageDirection) {
+    if (type === 'custom') return; // handled separately
+    const opt = DIRECTION_OPTIONS.find((o) => o.value === type)!;
+    onChange([...directions, { type, label: opt.label }]);
+    setShowPicker(false);
+  }
+
+  function addCustom() {
+    if (!customLabel.trim()) return;
+    onChange([...directions, { type: 'custom', label: customLabel.trim() }]);
+    setCustomLabel('');
+    setShowPicker(false);
   }
 
   function removeDirection(idx: number) {
@@ -85,77 +90,64 @@ function DirectionsEditor({ directions, onChange }: DirectionsEditorProps) {
 
   return (
     <div className="mt-2 pt-2 border-t border-dashed border-border/60">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-subtle">Direções</span>
-
+      <div className="flex items-center gap-1.5 flex-wrap">
         {/* Existing pills */}
         {directions.map((dir, i) => {
           const Icon = directionIcons[dir.type] || Zap;
           const isWarning = ['silencio', 'decrescendo'].includes(dir.type);
           const isInfo    = ['solo_instrumento', 'custom'].includes(dir.type);
           return (
-            <span
-              key={i}
-              className={`stage-pill pr-1 ${isWarning ? 'stage-pill--warning' : isInfo ? 'stage-pill--info' : ''}`}
-            >
+            <span key={i} className={`stage-pill pr-1 ${isWarning ? 'stage-pill--warning' : isInfo ? 'stage-pill--info' : ''}`}>
               <Icon className="w-3 h-3" />
               {dir.label}
-              <button
-                onClick={() => removeDirection(i)}
-                className="ml-1 hover:opacity-70 cursor-pointer"
-                title="Remover"
-              >
+              <button onClick={() => removeDirection(i)} className="ml-1 hover:opacity-60 cursor-pointer" title="Remover">
                 <XIcon className="w-2.5 h-2.5" />
               </button>
             </span>
           );
         })}
 
-        {/* Add button */}
-        {!showAdd && (
-          <button
-            onClick={() => setShowAdd(true)}
-            className="stage-pill cursor-pointer hover:opacity-80 transition-opacity"
-            title="Adicionar direção"
-          >
-            <Plus className="w-3 h-3" />
-            Adicionar
-          </button>
-        )}
+        {/* + button */}
+        <button
+          onClick={() => setShowPicker(!showPicker)}
+          className="stage-pill cursor-pointer hover:opacity-80 transition-opacity"
+          title="Adicionar direção"
+        >
+          <Plus className="w-3 h-3" />
+        </button>
       </div>
 
-      {/* Inline add form */}
-      {showAdd && (
-        <div className="flex items-center gap-2 mt-2 flex-wrap">
-          <select
-            value={addingType}
-            onChange={(e) => setAddingType(e.target.value as StageDirection)}
-            className="px-2 py-1 bg-elevated border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50 cursor-pointer"
-          >
-            {DIRECTION_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-          <input
-            value={addingLabel}
-            onChange={(e) => setAddingLabel(e.target.value)}
-            placeholder="Rótulo (opcional)"
-            className="flex-1 min-w-[120px] px-2 py-1 bg-elevated border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50"
-            onKeyDown={(e) => { if (e.key === 'Enter') addDirection(); if (e.key === 'Escape') setShowAdd(false); }}
-            autoFocus
-          />
-          <button
-            onClick={addDirection}
-            className="px-3 py-1 bg-accent text-white rounded-md text-xs font-semibold hover:bg-accent/90 cursor-pointer transition-colors"
-          >
-            OK
-          </button>
-          <button
-            onClick={() => setShowAdd(false)}
-            className="px-2 py-1 bg-elevated text-muted rounded-md text-xs hover:bg-border cursor-pointer transition-colors"
-          >
-            Cancelar
-          </button>
+      {/* Quick-pick grid */}
+      {showPicker && (
+        <div className="mt-2 p-2 bg-elevated rounded-lg border border-border space-y-2">
+          <div className="flex flex-wrap gap-1.5">
+            {DIRECTION_OPTIONS.filter((o) => o.value !== 'custom').map((opt) => {
+              const Icon = opt.icon;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => addDirection(opt.value)}
+                  className="stage-pill cursor-pointer hover:bg-accent hover:text-white transition-colors"
+                >
+                  <Icon className="w-3 h-3" />
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          {/* Custom */}
+          <div className="flex gap-2 items-center">
+            <input
+              value={customLabel}
+              onChange={(e) => setCustomLabel(e.target.value)}
+              placeholder="Personalizado..."
+              className="flex-1 px-2 py-1 bg-card border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50"
+              onKeyDown={(e) => { if (e.key === 'Enter') addCustom(); if (e.key === 'Escape') setShowPicker(false); }}
+            />
+            <button onClick={addCustom} className="px-2 py-1 bg-accent text-white rounded-md text-xs font-semibold hover:bg-accent/90 cursor-pointer">
+              +
+            </button>
+          </div>
         </div>
       )}
     </div>

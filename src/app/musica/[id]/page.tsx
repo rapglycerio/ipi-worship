@@ -956,6 +956,18 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
         )}
       </div>
 
+      {/* Print-only header */}
+      <div className="hidden print:block px-5 pb-3 border-b border-gray-300 mb-4">
+        <h1 className="text-2xl font-bold">{song.title}</h1>
+        {activeVersion.artists.length > 0 && (
+          <p className="text-sm text-gray-600 mt-0.5">{activeVersion.artists.join(', ')}</p>
+        )}
+        <p className="text-sm font-mono mt-0.5">
+          Tom: {activeVersion.key}
+          {activeVersion.bpm ? `  ·  ${activeVersion.bpm} BPM` : ''}
+        </p>
+      </div>
+
       {/* Chord Display Area */}
       <ChordToolbar
         songTitle={song.title}
