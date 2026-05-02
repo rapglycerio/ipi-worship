@@ -119,7 +119,6 @@ export default function Sidebar() {
           bg-card border-r border-border
           flex flex-col
           transition-transform duration-300 ease-out
-          md:translate-x-0
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
           ${isCollapsed ? 'md:-translate-x-full' : 'md:translate-x-0'}
           no-print
