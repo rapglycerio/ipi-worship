@@ -201,7 +201,7 @@ export function ChordToolbar({
         </button>
       </div>
 
-      <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-1 px-1">
+      <div className="flex items-center gap-1 flex-wrap">
         {/* Transpose */}
         <div className="flex items-center gap-0.5 bg-elevated rounded-lg px-1 shrink-0">
           <button
