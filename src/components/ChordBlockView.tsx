@@ -127,21 +127,25 @@ export default function ChordBlockView({ block, viewMode, fontSize, transposeSem
         )}
       </div>
 
-      <div className="space-y-0.5">
-        {block.lines.map((line, i) => (
-          <div key={i}>
-            {viewMode === 'chords_and_lyrics' && line.chords.trim() && (
-              <div className={`chord-line ${fontSizeMap[fontSize]}`}>
-                {transposeLine(line.chords, transposeSemitones)}
-              </div>
-            )}
-            {line.lyrics.trim() && (
-              <div className={`lyric-line ${fontSizeMap[fontSize]}`}>
-                {line.lyrics}
-              </div>
-            )}
-          </div>
-        ))}
+      {/* overflow-x: auto permite scroll horizontal das cifras longas sem
+          afetar a página toda — essencial para leitura no celular */}
+      <div className="overflow-x-auto pb-0.5">
+        <div className="space-y-0.5">
+          {block.lines.map((line, i) => (
+            <div key={i}>
+              {viewMode === 'chords_and_lyrics' && line.chords.trim() && (
+                <div className={`chord-line ${fontSizeMap[fontSize]}`}>
+                  {transposeLine(line.chords, transposeSemitones)}
+                </div>
+              )}
+              {line.lyrics.trim() && (
+                <div className={`lyric-line ${fontSizeMap[fontSize]}`}>
+                  {line.lyrics}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -196,17 +200,17 @@ export function ChordToolbar({
             <span className="text-[11px] font-mono text-muted">{bpm} BPM</span>
           </div>
         </div>
-        <button onClick={() => window.print()} className="touch-target" aria-label="Imprimir cifra">
+        <button onClick={() => window.print()} className="h-8 w-8 flex items-center justify-center cursor-pointer hover:bg-elevated rounded-lg transition-colors" aria-label="Imprimir cifra">
           <Printer className="w-4 h-4 text-muted" />
         </button>
       </div>
 
-      <div className="flex items-center gap-1 flex-wrap">
+      <div className="flex items-center gap-1.5">
         {/* Transpose — shows transposed key directly */}
         <div className="flex items-center bg-elevated rounded-lg shrink-0">
           <button
             onClick={() => onTransposeChange(transposeSemitones - 1)}
-            className="touch-target text-sm font-bold text-muted px-2"
+            className="h-8 w-7 flex items-center justify-center text-sm font-bold text-muted cursor-pointer hover:bg-border rounded-l-lg transition-colors"
             aria-label="Diminuir tom"
           >−</button>
           <span className="text-xs font-mono font-bold text-accent w-8 text-center select-none">
@@ -214,7 +218,7 @@ export function ChordToolbar({
           </span>
           <button
             onClick={() => onTransposeChange(transposeSemitones + 1)}
-            className="touch-target text-sm font-bold text-muted px-2"
+            className="h-8 w-7 flex items-center justify-center text-sm font-bold text-muted cursor-pointer hover:bg-border rounded-r-lg transition-colors"
             aria-label="Aumentar tom"
           >+</button>
         </div>
@@ -223,7 +227,7 @@ export function ChordToolbar({
         {transposeSemitones !== 0 && (
           <button
             onClick={() => onTransposeChange(0)}
-            className="h-9 px-2 text-[10px] font-semibold bg-elevated rounded-lg text-muted hover:bg-border shrink-0 cursor-pointer transition-colors"
+            className="h-8 px-2 text-[10px] font-semibold bg-elevated rounded-lg text-muted hover:bg-border shrink-0 cursor-pointer transition-colors"
             title="Resetar transposição"
           >↺</button>
         )}
@@ -232,26 +236,28 @@ export function ChordToolbar({
         <div className="flex items-center bg-elevated rounded-lg shrink-0">
           <button
             onClick={() => { if (currentFontIndex > 0) onFontSizeChange(fontSizes[currentFontIndex - 1]); }}
-            className="touch-target text-muted px-1.5" aria-label="Diminuir fonte"
+            className="h-8 w-7 flex items-center justify-center text-muted cursor-pointer hover:bg-border rounded-l-lg transition-colors"
+            aria-label="Diminuir fonte"
           ><Type className="w-3 h-3" /></button>
-          <span className="text-[10px] font-semibold text-foreground w-5 text-center select-none">{fontSize.toUpperCase()}</span>
+          <span className="text-[10px] font-semibold text-foreground w-6 text-center select-none">{fontSize.toUpperCase()}</span>
           <button
             onClick={() => { if (currentFontIndex < fontSizes.length - 1) onFontSizeChange(fontSizes[currentFontIndex + 1]); }}
-            className="touch-target text-muted px-1.5" aria-label="Aumentar fonte"
+            className="h-8 w-7 flex items-center justify-center text-muted cursor-pointer hover:bg-border rounded-r-lg transition-colors"
+            aria-label="Aumentar fonte"
           ><Type className="w-4 h-4" /></button>
         </div>
 
-        {/* View Mode — icon + label, label hidden on small screens */}
+        {/* View Mode — icon + label */}
         <button
           onClick={() => onViewModeChange(isLyricsOnly ? 'chords_and_lyrics' : 'lyrics_only')}
-          className="flex items-center gap-1.5 bg-elevated rounded-lg px-2.5 h-9 text-[10px] font-semibold text-foreground shrink-0 cursor-pointer hover:bg-border transition-colors"
+          className="flex items-center gap-1 bg-elevated rounded-lg px-2 h-8 text-[10px] font-semibold text-foreground shrink-0 cursor-pointer hover:bg-border transition-colors"
           aria-label={isLyricsOnly ? 'Mostrar cifra e letra' : 'Mostrar só letra'}
           title={isLyricsOnly ? 'Cifra + Letra' : 'Só Letra'}
         >
           {isLyricsOnly
             ? <EyeOff className="w-3.5 h-3.5 text-muted" />
             : <Eye    className="w-3.5 h-3.5 text-accent" />}
-          <span className="hidden sm:inline">{isLyricsOnly ? 'Só Letra' : 'Cifra + Letra'}</span>
+          <span>{isLyricsOnly ? 'Letra' : 'Cifra'}</span>
         </button>
       </div>
     </div>

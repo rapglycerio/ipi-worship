@@ -338,20 +338,20 @@ function PlaylistSection({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
             <CalendarDays className="w-5 h-5 text-accent" />
           </div>
-          <div>
-            <h2 className="text-base font-bold text-foreground">{playlist.name}</h2>
-            <p className="text-xs text-muted">
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-foreground truncate">{playlist.name}</h2>
+            <p className="text-xs text-muted truncate">
               {formatShortDate(playlist.serviceDate)} · Culto {serviceLabel(playlist.serviceType)}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-mono text-subtle bg-elevated px-2.5 py-1 rounded-md">
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-mono text-subtle bg-elevated px-2.5 py-1 rounded-md whitespace-nowrap">
             {playlistSongs.length} músicas
           </span>
           <Link

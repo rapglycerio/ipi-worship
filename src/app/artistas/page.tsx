@@ -1,13 +1,14 @@
 'use client';
 
 import { useMemo } from 'react';
-import { mockSongs, getDefaultVersion } from '@/data/mock-songs';
+import { useSongs } from '@/hooks/useData';
 import Link from 'next/link';
 import {
   Users,
   Music2,
   ChevronRight,
   Disc3,
+  Loader2,
 } from 'lucide-react';
 
 interface ArtistInfo {
@@ -17,10 +18,12 @@ interface ArtistInfo {
 }
 
 export default function ArtistasPage() {
+  const { songs, loading } = useSongs();
+
   const artists = useMemo(() => {
     const map = new Map<string, ArtistInfo>();
 
-    mockSongs.forEach((song) => {
+    songs.forEach((song) => {
       song.versions.forEach((v) => {
         v.artists.forEach((artist) => {
           const existing = map.get(artist);
@@ -42,7 +45,15 @@ export default function ArtistasPage() {
     });
 
     return Array.from(map.values()).sort((a, b) => b.songCount - a.songCount);
-  }, []);
+  }, [songs]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-accent animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -61,49 +72,56 @@ export default function ArtistasPage() {
 
       {/* Artist Cards */}
       <div className="px-5 md:px-8 pb-12 space-y-2">
-        {artists.map((artist, i) => (
-          <div
-            key={artist.name}
-            className="bg-card border border-border rounded-xl p-4 hover:border-accent/30 transition-all duration-200 animate-slide-up"
-            style={{ animationDelay: `${i * 60}ms` }}
-          >
-            <div className="flex items-center gap-3">
-              {/* Avatar */}
-              <div className="w-11 h-11 rounded-full bg-accent-subtle flex items-center justify-center shrink-0">
-                <span className="text-lg font-bold text-accent">
-                  {artist.name.charAt(0).toUpperCase()}
-                </span>
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-foreground">{artist.name}</h3>
-                <p className="text-[11px] text-muted flex items-center gap-1 mt-0.5">
-                  <Disc3 className="w-3 h-3" />
-                  {artist.songCount} música{artist.songCount !== 1 ? 's' : ''}
-                </p>
-              </div>
-            </div>
-
-            {/* Song List */}
-            <div className="mt-3 space-y-1">
-              {artist.songs.map((song) => (
-                <Link
-                  key={song.id}
-                  href={`/musica/${song.id}`}
-                  className="flex items-center justify-between px-3 py-2 rounded-lg bg-elevated hover:bg-border transition-colors text-xs cursor-pointer group"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Music2 className="w-3.5 h-3.5 text-subtle shrink-0" />
-                    <span className="text-muted group-hover:text-accent transition-colors truncate">
-                      {song.title}
-                    </span>
-                  </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-subtle group-hover:text-accent transition-colors shrink-0" />
-                </Link>
-              ))}
-            </div>
+        {artists.length === 0 ? (
+          <div className="text-center py-12">
+            <Users className="w-10 h-10 text-subtle mx-auto mb-3" />
+            <p className="text-sm text-muted">Nenhum artista encontrado.</p>
           </div>
-        ))}
+        ) : (
+          artists.map((artist, i) => (
+            <div
+              key={artist.name}
+              className="bg-card border border-border rounded-xl p-4 hover:border-accent/30 transition-all duration-200 animate-slide-up"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
+              <div className="flex items-center gap-3">
+                {/* Avatar */}
+                <div className="w-11 h-11 rounded-full bg-accent-subtle flex items-center justify-center shrink-0">
+                  <span className="text-lg font-bold text-accent">
+                    {artist.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-foreground">{artist.name}</h3>
+                  <p className="text-[11px] text-muted flex items-center gap-1 mt-0.5">
+                    <Disc3 className="w-3 h-3" />
+                    {artist.songCount} música{artist.songCount !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
+
+              {/* Song List */}
+              <div className="mt-3 space-y-1">
+                {artist.songs.map((song) => (
+                  <Link
+                    key={song.id}
+                    href={`/musica/${song.id}`}
+                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-elevated hover:bg-border transition-colors text-xs cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Music2 className="w-3.5 h-3.5 text-subtle shrink-0" />
+                      <span className="text-muted group-hover:text-accent transition-colors truncate">
+                        {song.title}
+                      </span>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-subtle group-hover:text-accent transition-colors shrink-0" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

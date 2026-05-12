@@ -94,6 +94,7 @@ export async function insertSong(song: Omit<MasterSong, 'id' | 'createdAt' | 'up
       title: song.title,
       original_composer: song.originalComposer || null,
       nature: song.nature,
+      is_adjusted: song.isAdjusted ?? false,
       searchable_lyrics: song.searchableLyrics || null,
     })
     .select('id')
@@ -315,12 +316,14 @@ export async function updateSongMetadata(
     originalComposer?: string;
     nature?: string;
     liturgicalTags?: LiturgicalTag[];
+    isAdjusted?: boolean;
   }
 ): Promise<boolean> {
-  const patch: Record<string, string | null> = {};
+  const patch: Record<string, string | boolean | null> = {};
   if (data.title !== undefined) patch.title = data.title;
   if (data.originalComposer !== undefined) patch.original_composer = data.originalComposer || null;
   if (data.nature !== undefined) patch.nature = data.nature;
+  if (data.isAdjusted !== undefined) patch.is_adjusted = data.isAdjusted;
 
   if (Object.keys(patch).length > 0) {
     const { error } = await supabase.from('master_songs').update(patch).eq('id', id);
@@ -455,6 +458,46 @@ export async function removeSuggestion(id: string): Promise<boolean> {
   return true;
 }
 
+// === USER MANAGEMENT ===
+
+export interface AppUserRecord {
+  id: string;
+  email: string;
+  name: string | null;
+  image: string | null;
+  isAdmin: boolean;
+  role: string;
+  createdAt: string;
+  lastSeen: string;
+}
+
+export async function fetchAllUsers(): Promise<AppUserRecord[]> {
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) { console.error('Error fetching users:', error); return []; }
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    email: row.email,
+    name: row.display_name ?? null,
+    image: row.photo_url ?? null,
+    isAdmin: row.role === 'admin',
+    role: row.role,
+    createdAt: row.created_at,
+    lastSeen: row.last_seen,
+  }));
+}
+
+export async function setUserAdmin(userId: string, admin: boolean): Promise<boolean> {
+  const { error } = await supabase
+    .from('app_users')
+    .update({ role: admin ? 'admin' : 'member' })
+    .eq('id', userId);
+  if (error) { console.error('Error updating user role:', error); return false; }
+  return true;
+}
+
 // === AUTH HELPERS ===
 
 export async function getUserRole(email: string): Promise<string | null> {
@@ -527,6 +570,7 @@ function mapDbSongToMasterSong(row: any): MasterSong {
         }
       : undefined,
     versions,
+    isAdjusted: row.is_adjusted ?? false,
     searchableLyrics: row.searchable_lyrics || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

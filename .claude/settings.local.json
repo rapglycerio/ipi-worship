@@ -24,7 +24,19 @@
       "mcp__a87d4bf7-2993-4dad-96d5-af124b25c560__web_fetch_vercel_url",
       "mcp__a87d4bf7-2993-4dad-96d5-af124b25c560__get_access_to_vercel_url",
       "WebFetch(domain:ipi-worship-qwz5qd2ww-rapglycerios-projects.vercel.app)",
-      "WebFetch(domain:ipi-worship.vercel.app)"
+      "WebFetch(domain:ipi-worship.vercel.app)",
+      "Bash(git push *)",
+      "Bash(git commit -m 'fix: sidebar collapse — remove conflicting md:translate-x-0 hardcoded class *)",
+      "Bash(py \"C:\\\\Users\\\\rapha\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\fd815db9-e394-4aa1-a196-bfe32a54d500\\\\903b8c56-8d04-441d-a072-475e34a36f90\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"music worship PWA mobile nav sidebar touch\" --domain ux)",
+      "Bash(git commit -m 'fix: remove horizontal scroll on toolbar — use flex-wrap instead of overflow-x-auto *)",
+      "mcp__a87d4bf7-2993-4dad-96d5-af124b25c560__list_projects",
+      "mcp__a87d4bf7-2993-4dad-96d5-af124b25c560__deploy_to_vercel",
+      "Bash(py -3 -c ' *)",
+      "Bash(node --env-file=.env.local scripts/import-songs.mjs)",
+      "Bash(cat -n \"C:\\\\Users\\\\rapha\\\\Documents\\\\Antigravity\\\\Projetos\\\\ipi-worship\\\\src\\\\components\\\\Sidebar.tsx\" | head -5)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\rapha\\\\Documents\\\\Antigravity\\\\Projetos\\\\ipi-worship\\\\src\\\\app\\\\usuarios\")",
+      "Read(//c/Users/rapha/Documents/Antigravity/Projetos/ipi-worship/**)",
+      "Bash(npx next *)"
     ]
   }
 }

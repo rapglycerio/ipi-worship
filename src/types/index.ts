@@ -57,14 +57,26 @@ export type SongNature = 'louvor' | 'hino';
 /** Theological approval status */
 export type ApprovalStatus = 'approved' | 'rejected' | 'pending';
 
-/** Musical key (all chromatic notes) */
+/** Musical key (chromatic notes + common worship extensions) */
 export type MusicalKey =
+  // — Major keys —
   | 'C' | 'C#' | 'Db' | 'D' | 'D#' | 'Eb'
   | 'E' | 'F' | 'F#' | 'Gb' | 'G' | 'G#'
   | 'Ab' | 'A' | 'A#' | 'Bb' | 'B'
+  // — Minor keys —
   | 'Cm' | 'C#m' | 'Dm' | 'D#m' | 'Ebm'
   | 'Em' | 'Fm' | 'F#m' | 'Gm' | 'G#m'
-  | 'Am' | 'A#m' | 'Bbm' | 'Bm';
+  | 'Am' | 'A#m' | 'Bbm' | 'Bm'
+  // — add9 / sus2 variants (very common in Brazilian worship) —
+  | 'C9' | 'C#9' | 'Db9' | 'D9' | 'D#9' | 'Eb9'
+  | 'E9' | 'F9' | 'F#9' | 'Gb9' | 'G9' | 'G#9'
+  | 'Ab9' | 'A9' | 'A#9' | 'Bb9' | 'B9'
+  // — Minor add9 —
+  | 'Cm9' | 'Dm9' | 'Em9' | 'F#m9' | 'Gm9' | 'Am9' | 'Bm9'
+  // — Major 7th (7M notation used in Brazilian charts) —
+  | 'C7M' | 'D7M' | 'E7M' | 'F7M' | 'G7M' | 'A7M' | 'B7M'
+  // — Minor major 7th —
+  | 'Cm7M' | 'Dm7M' | 'Em7M' | 'F#m7M' | 'Gm7M' | 'Am7M' | 'Bm7M';
 
 /** A single stage direction attached to a block */
 export interface StageDirectionItem {
@@ -143,6 +155,8 @@ export interface MasterSong {
   analysis?: TheologicalAnalysis;
   /** All versions/arrangements */
   versions: SongVersion[];
+  /** Whether the chord sheet has been manually reviewed/adjusted */
+  isAdjusted: boolean;
   /** Search-optimized: full lyrics concatenated for text search */
   searchableLyrics?: string;
   createdAt: string;

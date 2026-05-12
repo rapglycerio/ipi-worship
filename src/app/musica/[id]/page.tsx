@@ -31,6 +31,8 @@ import {
   Clock,
   LayoutList,
   Lightbulb,
+  CheckCircle2,
+  Circle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -461,7 +463,7 @@ function EditSongModal({ song, onClose, onSaved }: EditSongModalProps) {
 export default function SongPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: session } = useSession();
-  const userRole = (session?.user as { role?: string })?.role;
+
 
   const [song, setSong] = useState<MasterSong | null | undefined>(undefined);
   const [viewMode, setViewMode] = useState<ViewMode>('chords_and_lyrics');
@@ -477,6 +479,7 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
   const [showEditSong, setShowEditSong] = useState(false);
   const [showEditBlocks, setShowEditBlocks] = useState(false);
   const [editBlocks, setEditBlocks] = useState<ChordBlock[]>([]);
+  const [markAsAdjusted, setMarkAsAdjusted] = useState(false);
   const [savingBlocks, setSavingBlocks] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -562,7 +565,7 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
 
   const analysis = song.analysis;
   const approvalStatus = analysis?.status || 'pending';
-  const isAdmin = userRole === 'admin';
+  const isAdmin = (session?.user as any)?.isAdmin === true;
   const isLoggedIn = !!session?.user;
 
   const handleFontSizeChange = (size: FontSizePreset) => {
@@ -614,6 +617,7 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
 
   const handleOpenEditBlocks = () => {
     setEditBlocks(activeVersion.blocks.map((b) => ({ ...b })));
+    setMarkAsAdjusted(song?.isAdjusted ?? false);
     setShowEditBlocks(true);
   };
 
@@ -621,9 +625,14 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
     if (savingBlocks) return;
     setSavingBlocks(true);
     try {
-      const { updateVersionBlocks } = await import('@/lib/data');
-      const ok = await updateVersionBlocks(activeVersion.id, editBlocks);
-      if (ok) {
+      const { updateVersionBlocks, updateSongMetadata } = await import('@/lib/data');
+      const promises: Promise<boolean>[] = [updateVersionBlocks(activeVersion.id, editBlocks)];
+      // Save isAdjusted if it changed
+      if (song && markAsAdjusted !== song.isAdjusted) {
+        promises.push(updateSongMetadata(song.id, { isAdjusted: markAsAdjusted }));
+      }
+      const results = await Promise.all(promises);
+      if (results.every(Boolean)) {
         setShowEditBlocks(false);
         loadSong();
       } else {
@@ -695,13 +704,24 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
       {/* Edit Blocks fullscreen */}
       {showEditBlocks && (
         <div className="fixed inset-0 z-50 flex flex-col bg-background">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
-            <div className="flex items-center gap-2">
-              <LayoutList className="w-4 h-4 text-accent" />
-              <span className="text-sm font-bold text-foreground">Editar Blocos</span>
-              <span className="text-xs text-subtle">— {song.title}</span>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0 gap-2 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
+              <LayoutList className="w-4 h-4 text-accent shrink-0" />
+              <span className="text-sm font-bold text-foreground truncate">{song.title}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Ajustada toggle */}
+              <button
+                onClick={() => setMarkAsAdjusted(!markAsAdjusted)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer
+                  ${markAsAdjusted ? 'bg-success/10 text-success' : 'bg-elevated text-muted hover:bg-border'}`}
+                title={markAsAdjusted ? 'Cifra marcada como ajustada' : 'Marcar como ajustada'}
+              >
+                {markAsAdjusted
+                  ? <CheckCircle2 className="w-3.5 h-3.5" />
+                  : <Circle className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">{markAsAdjusted ? 'Ajustada' : 'Marcar Ajustada'}</span>
+              </button>
               <button
                 onClick={() => setShowEditBlocks(false)}
                 className="px-3 py-1.5 rounded-lg bg-elevated text-muted text-xs font-semibold hover:bg-border transition-all cursor-pointer"
@@ -781,25 +801,25 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
 
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">
+              <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-tight leading-tight min-w-0 break-words">
                 {song.title}
               </h1>
-              {/* Action buttons */}
-              <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+              {/* Action buttons — ícones sempre visíveis, labels só em sm+ */}
+              <div className="flex items-center gap-1 shrink-0 mt-0.5 flex-wrap justify-end">
                 {isLoggedIn && (
                   <>
                     <button
                       onClick={() => setShowAddToPlaylist(true)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-semibold hover:bg-accent hover:text-white transition-all cursor-pointer"
+                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-semibold hover:bg-accent hover:text-white transition-all cursor-pointer"
                       title="Adicionar à playlist"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      Playlist
+                      <span>Playlist</span>
                     </button>
                     <button
                       onClick={() => suggested ? undefined : setShowSuggest(true)}
                       disabled={suggested}
-                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                         suggested
                           ? 'bg-success/10 text-success cursor-default'
                           : 'bg-elevated text-muted hover:bg-border'
@@ -807,7 +827,7 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
                       title="Sugerir para próxima playlist"
                     >
                       <Lightbulb className="w-3.5 h-3.5" />
-                      {suggested ? 'Sugerida!' : 'Sugerir'}
+                      <span>{suggested ? 'Sugerida!' : 'Sugerir'}</span>
                     </button>
                   </>
                 )}
@@ -815,23 +835,23 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
                   <>
                     <button
                       onClick={() => setShowEditSong(true)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-elevated text-muted text-xs font-semibold hover:bg-border transition-all cursor-pointer"
+                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-elevated text-muted text-xs font-semibold hover:bg-border transition-all cursor-pointer"
                       title="Editar metadados"
                     >
                       <Pencil className="w-3.5 h-3.5" />
-                      Editar
+                      <span>Editar</span>
                     </button>
                     <button
                       onClick={handleOpenEditBlocks}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-elevated text-muted text-xs font-semibold hover:bg-border transition-all cursor-pointer"
+                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-elevated text-muted text-xs font-semibold hover:bg-border transition-all cursor-pointer"
                       title="Editar blocos"
                     >
                       <LayoutList className="w-3.5 h-3.5" />
-                      Blocos
+                      <span>Blocos</span>
                     </button>
                     <button
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-danger/10 text-danger text-xs font-semibold hover:bg-danger/20 transition-all cursor-pointer"
+                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-danger/10 text-danger text-xs font-semibold hover:bg-danger/20 transition-all cursor-pointer"
                       title="Excluir música"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

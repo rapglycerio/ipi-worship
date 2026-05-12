@@ -16,6 +16,8 @@ import {
   TrendingUp,
   ListMusic,
   Users,
+  CheckCircle2,
+  Circle,
 } from 'lucide-react';
 
 const allTags: LiturgicalTag[] = [
@@ -29,6 +31,7 @@ export default function MusicasPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedNature, setSelectedNature] = useState<SongNature | 'all'>('all');
   const [selectedTag, setSelectedTag] = useState<LiturgicalTag | null>(null);
+  const [selectedAdjusted, setSelectedAdjusted] = useState<'all' | 'adjusted' | 'pending'>('all');
   const [showFilters, setShowFilters] = useState(false);
 
   const filteredSongs = useMemo(() => {
@@ -55,9 +58,13 @@ export default function MusicasPage() {
       // Tag filter
       if (selectedTag && !song.liturgicalTags.includes(selectedTag)) return false;
 
+      // Adjusted filter
+      if (selectedAdjusted === 'adjusted' && !song.isAdjusted) return false;
+      if (selectedAdjusted === 'pending' && song.isAdjusted) return false;
+
       return true;
     });
-  }, [songs, searchQuery, selectedNature, selectedTag]);
+  }, [songs, searchQuery, selectedNature, selectedTag, selectedAdjusted]);
 
   const approvedCount = songs.filter((s) => s.analysis?.status === 'approved').length;
   const pendingCount = songs.filter((s) => !s.analysis || s.analysis.status === 'pending').length;
@@ -151,7 +158,7 @@ export default function MusicasPage() {
         >
           <Filter className="w-3.5 h-3.5" />
           Filtros
-          {(selectedNature !== 'all' || selectedTag) && (
+          {(selectedNature !== 'all' || selectedTag || selectedAdjusted !== 'all') && (
             <span className="w-1.5 h-1.5 rounded-full bg-accent" />
           )}
         </button>
@@ -212,10 +219,37 @@ export default function MusicasPage() {
               </div>
             </div>
 
+            {/* Situação da Cifra */}
+            <div className="mt-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-subtle mb-2">
+                Situação da Cifra
+              </p>
+              <div className="flex items-center gap-2">
+                {([
+                  { value: 'all', label: 'Todas', icon: null },
+                  { value: 'adjusted', label: 'Ajustadas', icon: CheckCircle2 },
+                  { value: 'pending', label: 'Pendentes', icon: Circle },
+                ] as const).map((opt) => {
+                  const Icon = opt.icon;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => setSelectedAdjusted(opt.value)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all
+                        ${selectedAdjusted === opt.value ? 'bg-accent text-white' : 'bg-elevated text-muted hover:bg-border'}`}
+                    >
+                      {Icon && <Icon className="w-3 h-3" />}
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Clear Filters */}
-            {(selectedNature !== 'all' || selectedTag) && (
+            {(selectedNature !== 'all' || selectedTag || selectedAdjusted !== 'all') && (
               <button
-                onClick={() => { setSelectedNature('all'); setSelectedTag(null); }}
+                onClick={() => { setSelectedNature('all'); setSelectedTag(null); setSelectedAdjusted('all'); }}
                 className="mt-3 text-xs text-accent font-medium hover:underline cursor-pointer"
               >
                 Limpar filtros

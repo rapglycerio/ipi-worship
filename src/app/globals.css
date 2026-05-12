@@ -115,7 +115,6 @@
 html {
   scroll-behavior: smooth;
   -webkit-tap-highlight-color: transparent;
-  overflow-x: hidden;
 }
 
 body {
@@ -125,7 +124,7 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  /* overflow-x contido por cada container, não pela página inteira */
 }
 
 /* --- SCROLLBAR CUSTOM (Dark Mode Friendly) --- */
@@ -358,6 +357,13 @@ body {
 /* --- SAFE AREA (iPhone notch / home indicator) --- */
 .pb-safe {
   padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+/* Mobile main content: clear bottom tab bar (56px) + safe area */
+@media (max-width: 767px) {
+  main {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom)) !important;
+  }
 }
 
 /* --- SIDEBAR COLLAPSED (icon-only, 56px) --- */

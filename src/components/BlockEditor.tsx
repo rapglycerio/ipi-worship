@@ -107,13 +107,14 @@ function DirectionsEditor({ directions, onChange }: DirectionsEditorProps) {
           );
         })}
 
-        {/* + button */}
+        {/* + direção button */}
         <button
           onClick={() => setShowPicker(!showPicker)}
-          className="stage-pill cursor-pointer hover:opacity-80 transition-opacity"
-          title="Adicionar direção"
+          className="stage-pill cursor-pointer hover:opacity-80 transition-opacity gap-1"
+          title="Adicionar direção de palco (crescendo, a cappella, etc.)"
         >
           <Plus className="w-3 h-3" />
+          <span>direção</span>
         </button>
       </div>
 
@@ -221,18 +222,18 @@ function BlockCard({
           </span>
         </div>
 
-        {/* Actions — hover to reveal */}
-        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={onMoveUp}     disabled={isFirst} className="p-1 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer" title="Subir">
+        {/* Actions — always visible */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button onClick={onMoveUp}     disabled={isFirst} className="p-1.5 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer rounded transition-colors" title="Subir">
             <ChevronUp   className="w-3.5 h-3.5" />
           </button>
-          <button onClick={onMoveDown}   disabled={isLast}  className="p-1 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer" title="Descer">
+          <button onClick={onMoveDown}   disabled={isLast}  className="p-1.5 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer rounded transition-colors" title="Descer">
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
-          <button onClick={onDuplicate}  className="p-1 text-subtle hover:text-accent  cursor-pointer" title="Duplicar">
+          <button onClick={onDuplicate}  className="p-1.5 text-subtle hover:text-accent cursor-pointer rounded transition-colors" title="Duplicar">
             <Copy        className="w-3.5 h-3.5" />
           </button>
-          <button onClick={onDelete}     className="p-1 text-subtle hover:text-danger  cursor-pointer" title="Excluir bloco">
+          <button onClick={onDelete}     className="p-1.5 text-subtle hover:text-danger cursor-pointer rounded transition-colors" title="Excluir bloco">
             <Trash2      className="w-3.5 h-3.5" />
           </button>
         </div>

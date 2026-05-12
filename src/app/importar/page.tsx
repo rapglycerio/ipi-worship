@@ -144,6 +144,7 @@ export default function ImportarPage() {
             updatedAt: '',
           },
         ],
+        isAdjusted: false,
         searchableLyrics,
       });
 
