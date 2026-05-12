@@ -418,6 +418,17 @@ export default function PlaylistsPage() {
         </div>
       )}
 
+      {/* Floating action button on mobile */}
+      <button
+        onClick={openCreate}
+        className="fixed bottom-20 right-4 md:hidden z-30 w-14 h-14 rounded-full bg-accent text-white shadow-lg shadow-accent/30 flex items-center justify-center cursor-pointer hover:bg-accent/90 transition-all active:scale-95"
+        style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom))' }}
+        aria-label="Nova Playlist"
+        title="Nova Playlist"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
+
       {modalOpen && (
         <PlaylistModal
           playlist={editingPlaylist}
@@ -450,6 +461,7 @@ function PlaylistDetail({
   const [arrangements, setArrangements] = useState<WorshipArrangement[]>(playlist.arrangements);
   const [showAddSong, setShowAddSong] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const handleShare = async () => {
     const url = `${window.location.origin}/playlists/${playlist.id}`;
@@ -482,6 +494,8 @@ function PlaylistDetail({
 
     setArrangements(reordered);
     await updateArrangementOrders(reordered.map((a, i) => ({ id: a.id, sortOrder: i })));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
   };
 
   const handleRemove = async (arrId: string) => {
@@ -573,9 +587,16 @@ function PlaylistDetail({
 
       <div className="px-5 md:px-8 pb-12">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-subtle">
-            Ordem do Culto ({arrangements.length} música{arrangements.length !== 1 ? 's' : ''})
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-subtle">
+              Ordem do Culto ({arrangements.length} música{arrangements.length !== 1 ? 's' : ''})
+            </p>
+            {saved && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-success animate-fade-in">
+                <Check className="w-3 h-3" /> Salvo
+              </span>
+            )}
+          </div>
           <button
             onClick={() => setShowAddSong(true)}
             className="flex items-center gap-1.5 text-xs text-accent font-semibold hover:text-accent/80 transition-colors cursor-pointer"
@@ -679,26 +700,23 @@ function SortableItem({
       <span className="text-[11px] font-bold text-subtle w-4 shrink-0 text-center">{index + 1}</span>
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground truncate">
-          {song?.title ?? <span className="text-subtle italic">Música removida</span>}
-        </p>
+        {song ? (
+          <Link
+            href={`/musica/${song.id}`}
+            className="text-sm font-semibold text-foreground hover:text-accent transition-colors truncate block"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {song.title}
+          </Link>
+        ) : (
+          <p className="text-sm font-semibold text-subtle italic truncate">Música removida</p>
+        )}
         {artists && <p className="text-[11px] text-muted truncate">{artists}</p>}
       </div>
 
       <span className="text-[10px] font-bold text-accent bg-accent-subtle px-2 py-1 rounded-md shrink-0">
         {displayKey}
       </span>
-
-      {song && (
-        <Link
-          href={`/musica/${song.id}`}
-          className="p-1.5 text-subtle hover:text-accent transition-colors"
-          aria-label="Ver cifra"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Music2 className="w-3.5 h-3.5" />
-        </Link>
-      )}
 
       <button
         onClick={onRemove}

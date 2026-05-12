@@ -800,66 +800,10 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-tight leading-tight min-w-0 break-words">
-                {song.title}
-              </h1>
-              {/* Action buttons — ícones sempre visíveis, labels só em sm+ */}
-              <div className="flex items-center gap-1 shrink-0 mt-0.5 flex-wrap justify-end">
-                {isLoggedIn && (
-                  <>
-                    <button
-                      onClick={() => setShowAddToPlaylist(true)}
-                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-semibold hover:bg-accent hover:text-white transition-all cursor-pointer"
-                      title="Adicionar à playlist"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Playlist</span>
-                    </button>
-                    <button
-                      onClick={() => suggested ? undefined : setShowSuggest(true)}
-                      disabled={suggested}
-                      className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                        suggested
-                          ? 'bg-success/10 text-success cursor-default'
-                          : 'bg-elevated text-muted hover:bg-border'
-                      }`}
-                      title="Sugerir para próxima playlist"
-                    >
-                      <Lightbulb className="w-3.5 h-3.5" />
-                      <span>{suggested ? 'Sugerida!' : 'Sugerir'}</span>
-                    </button>
-                  </>
-                )}
-                {isAdmin && (
-                  <>
-                    <button
-                      onClick={() => setShowEditSong(true)}
-                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-elevated text-muted text-xs font-semibold hover:bg-border transition-all cursor-pointer"
-                      title="Editar metadados"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                      <span>Editar</span>
-                    </button>
-                    <button
-                      onClick={handleOpenEditBlocks}
-                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-elevated text-muted text-xs font-semibold hover:bg-border transition-all cursor-pointer"
-                      title="Editar blocos"
-                    >
-                      <LayoutList className="w-3.5 h-3.5" />
-                      <span>Blocos</span>
-                    </button>
-                    <button
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-danger/10 text-danger text-xs font-semibold hover:bg-danger/20 transition-all cursor-pointer"
-                      title="Excluir música"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
+            {/* Title — full width, no buttons competing */}
+            <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-tight leading-tight break-words">
+              {song.title}
+            </h1>
 
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <span className="flex items-center gap-1 text-xs text-muted">
@@ -898,6 +842,64 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
             </div>
           </div>
         </div>
+
+        {/* Action bar — below title/tags, full width */}
+        {(isLoggedIn || isAdmin) && (
+          <div className="flex items-center gap-2 mt-4 flex-wrap">
+            {isLoggedIn && (
+              <>
+                <button
+                  onClick={() => setShowAddToPlaylist(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent/10 text-accent text-xs font-semibold hover:bg-accent hover:text-white transition-all cursor-pointer"
+                  title="Adicionar à playlist"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Playlist
+                </button>
+                <button
+                  onClick={() => suggested ? undefined : setShowSuggest(true)}
+                  disabled={suggested}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    suggested
+                      ? 'bg-success/10 text-success cursor-default'
+                      : 'bg-elevated text-muted hover:bg-border'
+                  }`}
+                  title="Sugerir para próxima playlist"
+                >
+                  <Lightbulb className="w-3.5 h-3.5" />
+                  {suggested ? 'Sugerida!' : 'Sugerir'}
+                </button>
+              </>
+            )}
+            {isAdmin && (
+              <>
+                <button
+                  onClick={() => setShowEditSong(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-elevated text-muted text-xs font-semibold hover:bg-border transition-all cursor-pointer"
+                  title="Editar metadados"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Metadados
+                </button>
+                <button
+                  onClick={handleOpenEditBlocks}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-elevated text-muted text-xs font-semibold hover:bg-border transition-all cursor-pointer"
+                  title="Editar blocos da cifra"
+                >
+                  <LayoutList className="w-3.5 h-3.5" />
+                  Editar Cifra
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-danger/10 text-danger text-xs font-semibold hover:bg-danger/20 transition-all cursor-pointer ml-auto"
+                  title="Excluir música"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Analysis Badge */}
         {analysis && (

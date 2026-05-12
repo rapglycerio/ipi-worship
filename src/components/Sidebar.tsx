@@ -36,10 +36,10 @@ const navItems = [
 
 // Mobile bottom tab items (most-used 4 + Mais)
 const bottomTabItems = [
-  { href: '/',         label: 'Semana',  icon: ListMusic },
-  { href: '/musicas',  label: 'Músicas', icon: Library },
-  { href: '/busca',    label: 'Buscar',  icon: Search },
+  { href: '/',         label: 'Semana',   icon: ListMusic },
+  { href: '/musicas',  label: 'Músicas',  icon: Library },
   { href: '/playlists',label: 'Playlists',icon: Music },
+  { href: '/importar', label: 'Importar', icon: Upload },
 ];
 
 // Items shown in the "Mais" bottom sheet
