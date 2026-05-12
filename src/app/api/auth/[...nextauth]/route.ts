@@ -41,6 +41,8 @@ const handler = NextAuth({
       if (session.user) {
         if (token.sub) (session.user as any).id = token.sub;
         if (token.role) (session.user as any).role = token.role;
+        // Expose isAdmin so all client components can use it directly
+        (session.user as any).isAdmin = token.role === 'admin';
       }
       return session;
     },

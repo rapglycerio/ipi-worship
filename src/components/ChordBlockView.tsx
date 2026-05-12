@@ -210,7 +210,7 @@ export function ChordToolbar({
         <div className="flex items-center bg-elevated rounded-lg shrink-0">
           <button
             onClick={() => onTransposeChange(transposeSemitones - 1)}
-            className="h-8 w-7 flex items-center justify-center text-sm font-bold text-muted cursor-pointer hover:bg-border rounded-l-lg transition-colors"
+            className="h-9 w-8 flex items-center justify-center text-sm font-bold text-muted cursor-pointer hover:bg-border rounded-l-lg transition-colors"
             aria-label="Diminuir tom"
           >−</button>
           <span className="text-xs font-mono font-bold text-accent w-8 text-center select-none">
@@ -218,7 +218,7 @@ export function ChordToolbar({
           </span>
           <button
             onClick={() => onTransposeChange(transposeSemitones + 1)}
-            className="h-8 w-7 flex items-center justify-center text-sm font-bold text-muted cursor-pointer hover:bg-border rounded-r-lg transition-colors"
+            className="h-9 w-8 flex items-center justify-center text-sm font-bold text-muted cursor-pointer hover:bg-border rounded-r-lg transition-colors"
             aria-label="Aumentar tom"
           >+</button>
         </div>
@@ -227,7 +227,7 @@ export function ChordToolbar({
         {transposeSemitones !== 0 && (
           <button
             onClick={() => onTransposeChange(0)}
-            className="h-8 px-2 text-[10px] font-semibold bg-elevated rounded-lg text-muted hover:bg-border shrink-0 cursor-pointer transition-colors"
+            className="h-9 px-2.5 text-[10px] font-semibold bg-elevated rounded-lg text-muted hover:bg-border shrink-0 cursor-pointer transition-colors"
             title="Resetar transposição"
           >↺</button>
         )}
@@ -236,13 +236,13 @@ export function ChordToolbar({
         <div className="flex items-center bg-elevated rounded-lg shrink-0">
           <button
             onClick={() => { if (currentFontIndex > 0) onFontSizeChange(fontSizes[currentFontIndex - 1]); }}
-            className="h-8 w-7 flex items-center justify-center text-muted cursor-pointer hover:bg-border rounded-l-lg transition-colors"
+            className="h-9 w-8 flex items-center justify-center text-muted cursor-pointer hover:bg-border rounded-l-lg transition-colors"
             aria-label="Diminuir fonte"
           ><Type className="w-3 h-3" /></button>
           <span className="text-[10px] font-semibold text-foreground w-6 text-center select-none">{fontSize.toUpperCase()}</span>
           <button
             onClick={() => { if (currentFontIndex < fontSizes.length - 1) onFontSizeChange(fontSizes[currentFontIndex + 1]); }}
-            className="h-8 w-7 flex items-center justify-center text-muted cursor-pointer hover:bg-border rounded-r-lg transition-colors"
+            className="h-9 w-8 flex items-center justify-center text-muted cursor-pointer hover:bg-border rounded-r-lg transition-colors"
             aria-label="Aumentar fonte"
           ><Type className="w-4 h-4" /></button>
         </div>
@@ -250,7 +250,7 @@ export function ChordToolbar({
         {/* View Mode — icon + label */}
         <button
           onClick={() => onViewModeChange(isLyricsOnly ? 'chords_and_lyrics' : 'lyrics_only')}
-          className="flex items-center gap-1 bg-elevated rounded-lg px-2 h-8 text-[10px] font-semibold text-foreground shrink-0 cursor-pointer hover:bg-border transition-colors"
+          className="flex items-center gap-1.5 bg-elevated rounded-lg px-3 h-9 text-[10px] font-semibold text-foreground shrink-0 cursor-pointer hover:bg-border transition-colors"
           aria-label={isLyricsOnly ? 'Mostrar cifra e letra' : 'Mostrar só letra'}
           title={isLyricsOnly ? 'Cifra + Letra' : 'Só Letra'}
         >

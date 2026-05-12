@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePlaylists, useSongs } from '@/hooks/useData';
 import {
   DndContext,
@@ -36,9 +36,12 @@ import {
   Check,
   History,
   Clock,
+  Lightbulb,
+  ListPlus,
 } from 'lucide-react';
 import Link from 'next/link';
-import type { Playlist, WorshipArrangement, MasterSong } from '@/types';
+import { useSession } from 'next-auth/react';
+import type { Playlist, WorshipArrangement, MasterSong, SongSuggestion } from '@/types';
 import {
   createPlaylist,
   updatePlaylist,
@@ -64,12 +67,27 @@ type Tab = 'upcoming' | 'past';
 export default function PlaylistsPage() {
   const { playlists, loading, refetch } = usePlaylists();
   const { songs } = useSongs();
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as any)?.isAdmin === true;
 
   const [tab, setTab] = useState<Tab>('upcoming');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const [suggestions, setSuggestions] = useState<SongSuggestion[]>([]);
+  const [addingSuggestion, setAddingSuggestion] = useState<SongSuggestion | null>(null);
+
+  useEffect(() => {
+    async function loadSuggestions() {
+      try {
+        const { fetchSuggestions } = await import('@/lib/data');
+        setSuggestions(await fetchSuggestions());
+      } catch { /* ignore */ }
+    }
+    loadSuggestions();
+  }, []);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -190,6 +208,117 @@ export default function PlaylistsPage() {
           </button>
         </div>
       </div>
+
+      {/* Suggestions panel */}
+      {suggestions.length > 0 && (
+        <section className="px-5 md:px-8 mb-4">
+          <div className="bg-elevated border border-border rounded-2xl overflow-hidden">
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border">
+              <Lightbulb className="w-4 h-4 text-warning shrink-0" />
+              <h2 className="text-sm font-bold text-foreground flex-1">Sugestões da Congregação</h2>
+              <span className="text-[11px] font-mono text-muted bg-card px-2 py-0.5 rounded-full border border-border">
+                {suggestions.length}
+              </span>
+            </div>
+            <ul className="divide-y divide-border">
+              {suggestions.map((s) => {
+                const song = songs.find((sg) => sg.id === s.masterSongId);
+                const defaultVersion = song?.versions[0];
+                return (
+                  <li key={s.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      {song ? (
+                        <Link
+                          href={`/musica/${song.id}`}
+                          className="text-sm font-semibold text-foreground hover:text-accent transition-colors cursor-pointer truncate block"
+                        >
+                          {song.title}
+                        </Link>
+                      ) : (
+                        <span className="text-sm font-semibold text-foreground truncate block">
+                          {s.songTitle ?? 'Música'}
+                        </span>
+                      )}
+                      <p className="text-xs text-muted truncate">
+                        Sugerido por <span className="font-medium text-foreground">{s.suggestedByName}</span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {isAdmin && song && defaultVersion && (
+                        <button
+                          onClick={() => setAddingSuggestion(s)}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-semibold hover:bg-accent/20 transition-colors cursor-pointer"
+                          title="Adicionar à playlist"
+                        >
+                          <ListPlus className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Adicionar</span>
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button
+                          onClick={async () => {
+                            const { removeSuggestion } = await import('@/lib/data');
+                            await removeSuggestion(s.id);
+                            setSuggestions((prev) => prev.filter((x) => x.id !== s.id));
+                          }}
+                          className="p-1.5 rounded-lg text-subtle hover:text-foreground hover:bg-border transition-colors cursor-pointer"
+                          title="Dispensar sugestão"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </section>
+      )}
+
+      {/* Add suggestion to playlist modal */}
+      {addingSuggestion && (() => {
+        const song = songs.find((sg) => sg.id === addingSuggestion.masterSongId);
+        const defaultVersion = song?.versions[0];
+        if (!song || !defaultVersion) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setAddingSuggestion(null)}>
+            <div className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <div>
+                  <p className="text-sm font-bold text-foreground">Adicionar à playlist</p>
+                  <p className="text-xs text-muted truncate max-w-[220px]">{song.title}</p>
+                </div>
+                <button onClick={() => setAddingSuggestion(null)} className="p-1.5 rounded-lg text-subtle hover:text-foreground hover:bg-elevated cursor-pointer transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="max-h-72 overflow-y-auto divide-y divide-border">
+                {playlists.map((pl) => (
+                  <button
+                    key={pl.id}
+                    onClick={async () => {
+                      const { addSongToPlaylist, removeSuggestion } = await import('@/lib/data');
+                      await addSongToPlaylist({ playlistId: pl.id, masterSongId: song.id, versionId: defaultVersion.id, sortOrder: pl.arrangements.length });
+                      await removeSuggestion(addingSuggestion.id);
+                      setSuggestions((prev) => prev.filter((x) => x.id !== addingSuggestion.id));
+                      setAddingSuggestion(null);
+                      refetch();
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-elevated transition-colors cursor-pointer"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{pl.name}</p>
+                      <p className="text-xs text-muted">{new Date(pl.serviceDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })}</p>
+                    </div>
+                    <Plus className="w-4 h-4 text-accent shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
