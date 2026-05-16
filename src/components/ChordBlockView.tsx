@@ -133,15 +133,21 @@ export default function ChordBlockView({ block, viewMode, fontSize, transposeSem
         <div className="space-y-0.5">
           {block.lines.map((line, i) => (
             <div key={i}>
-              {viewMode === 'chords_and_lyrics' && line.chords.trim() && (
-                <div className={`chord-line ${fontSizeMap[fontSize]}`}>
-                  {transposeLine(line.chords, transposeSemitones)}
-                </div>
-              )}
-              {line.lyrics.trim() && (
-                <div className={`lyric-line ${fontSizeMap[fontSize]}`}>
-                  {line.lyrics}
-                </div>
+              {line.blank ? (
+                <div className="h-3" aria-hidden="true" />
+              ) : (
+                <>
+                  {viewMode === 'chords_and_lyrics' && line.chords.trim() && (
+                    <div className={`chord-line ${fontSizeMap[fontSize]}`}>
+                      {transposeLine(line.chords, transposeSemitones)}
+                    </div>
+                  )}
+                  {line.lyrics.trim() && (
+                    <div className={`lyric-line ${fontSizeMap[fontSize]}`}>
+                      {line.lyrics}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ))}

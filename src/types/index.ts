@@ -103,6 +103,8 @@ export interface ChordLine {
   chords: string;
   /** Lyric text for this line */
   lyrics: string;
+  /** If true, renders as a blank spacer line (no chords, no lyrics) */
+  blank?: boolean;
 }
 
 /** Theological analysis attached to a Master Song */

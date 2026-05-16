@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { ChordBlock, ChordLine, BlockType, StageDirection, StageDirectionItem } from '@/types';
 import {
   ChevronUp, ChevronDown, Plus, Trash2, Copy,
   Repeat, Mic, Volume2, VolumeX, Zap, Hand,
-  ArrowUp, ArrowDown, X as XIcon,
+  ArrowUp, ArrowDown, X as XIcon, Scissors,
 } from 'lucide-react';
 
 // ── helpers ──────────────────────────────────────────────────
@@ -166,15 +166,39 @@ interface BlockCardProps {
   onDuplicate: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onSplitAt: (afterLineIdx: number) => void;
 }
 
 function BlockCard({
   block, isFirst, isLast,
-  onChange, onDelete, onDuplicate, onMoveUp, onMoveDown,
+  onChange, onDelete, onDuplicate, onMoveUp, onMoveDown, onSplitAt,
 }: BlockCardProps) {
+  // Track which line/field should receive focus after a state update
+  const [pendingFocus, setPendingFocus] = useState<{ idx: number; field: 'chords' | 'lyrics' } | null>(null);
+  const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+
+  useEffect(() => {
+    if (!pendingFocus) return;
+    const key = `${pendingFocus.idx}-${pendingFocus.field}`;
+    inputRefs.current.get(key)?.focus();
+    setPendingFocus(null);
+  }, [pendingFocus, block.lines.length]);
+
+  function setRef(idx: number, field: 'chords' | 'lyrics', el: HTMLInputElement | null) {
+    const key = `${idx}-${field}`;
+    if (el) inputRefs.current.set(key, el);
+    else inputRefs.current.delete(key);
+  }
 
   function updateLine(idx: number, field: keyof ChordLine, value: string) {
     onChange({ ...block, lines: block.lines.map((l, i) => (i === idx ? { ...l, [field]: value } : l)) });
+  }
+
+  function insertLineAfter(idx: number) {
+    const next = [...block.lines];
+    next.splice(idx + 1, 0, { chords: '', lyrics: '' });
+    onChange({ ...block, lines: next });
+    setPendingFocus({ idx: idx + 1, field: 'lyrics' });
   }
 
   function deleteLine(idx: number) {
@@ -182,14 +206,26 @@ function BlockCard({
     onChange({ ...block, lines: block.lines.filter((_, i) => i !== idx) });
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>, idx: number, field: 'chords' | 'lyrics') {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (field === 'chords') {
+        // Move to lyrics of same line
+        setPendingFocus({ idx, field: 'lyrics' });
+      } else {
+        // Insert new line below and focus its lyrics
+        insertLineAfter(idx);
+      }
+    }
+  }
+
   const blockStyle = blockTypeStyles[block.type] ?? 'block-verse';
 
   return (
     <div className={`${blockStyle} py-3 mb-3 group`}>
-      {/* ── Header — identical to ChordBlockView ── */}
+      {/* ── Header ── */}
       <div className="flex items-start justify-between mb-2 gap-2">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
-          {/* Editable label — same accent style */}
           <input
             value={block.label}
             onChange={(e) => onChange({ ...block, label: e.target.value })}
@@ -197,7 +233,6 @@ function BlockCard({
             style={{ width: `${Math.max(block.label.length, 3) + 1}ch` }}
             title="Editar rótulo"
           />
-          {/* Type selector */}
           <select
             value={block.type}
             onChange={(e) => onChange({ ...block, type: e.target.value as BlockType })}
@@ -208,7 +243,6 @@ function BlockCard({
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
-          {/* Repeat pill */}
           <span className="stage-pill">
             <Repeat className="w-3 h-3" />
             <input
@@ -222,54 +256,79 @@ function BlockCard({
           </span>
         </div>
 
-        {/* Actions — always visible */}
         <div className="flex items-center gap-0.5 shrink-0">
-          <button onClick={onMoveUp}     disabled={isFirst} className="p-1.5 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer rounded transition-colors" title="Subir">
+          <button onClick={onMoveUp}    disabled={isFirst} className="p-1.5 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer rounded transition-colors" title="Subir bloco">
             <ChevronUp   className="w-3.5 h-3.5" />
           </button>
-          <button onClick={onMoveDown}   disabled={isLast}  className="p-1.5 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer rounded transition-colors" title="Descer">
+          <button onClick={onMoveDown}  disabled={isLast}  className="p-1.5 text-subtle hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer rounded transition-colors" title="Descer bloco">
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
-          <button onClick={onDuplicate}  className="p-1.5 text-subtle hover:text-accent cursor-pointer rounded transition-colors" title="Duplicar">
+          <button onClick={onDuplicate} className="p-1.5 text-subtle hover:text-accent cursor-pointer rounded transition-colors" title="Duplicar bloco">
             <Copy        className="w-3.5 h-3.5" />
           </button>
-          <button onClick={onDelete}     className="p-1.5 text-subtle hover:text-danger cursor-pointer rounded transition-colors" title="Excluir bloco">
+          <button onClick={onDelete}    className="p-1.5 text-subtle hover:text-danger cursor-pointer rounded transition-colors" title="Excluir bloco">
             <Trash2      className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* ── Lines — chord-line + lyric-line style ── */}
-      <div className="space-y-1">
+      {/* ── Lines ── */}
+      <div className="space-y-0">
         {block.lines.map((line, i) => (
-          <div key={i} className="group/line relative pr-6">
-            <input
-              value={line.chords}
-              onChange={(e) => updateLine(i, 'chords', e.target.value)}
-              placeholder="acordes..."
-              className="chord-line w-full bg-transparent border-0 border-b border-dashed border-accent/20 focus:border-accent/50 focus:outline-none placeholder:opacity-30 pb-0.5"
-            />
-            <input
-              value={line.lyrics}
-              onChange={(e) => updateLine(i, 'lyrics', e.target.value)}
-              placeholder="letra..."
-              className="lyric-line w-full bg-transparent border-0 border-b border-dashed border-border/30 focus:border-border/60 focus:outline-none placeholder:text-subtle placeholder:opacity-50 pb-0.5 mt-0.5"
-            />
-            <button
-              onClick={() => deleteLine(i)}
-              disabled={block.lines.length <= 1}
-              className="absolute right-0 top-2 p-0.5 text-transparent group-hover/line:text-subtle/50 hover:!text-danger disabled:!opacity-0 transition-colors cursor-pointer"
-              title="Remover linha"
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
+          <div key={i}>
+            {/* Line inputs */}
+            <div className="group/line relative pr-6">
+              <input
+                ref={(el) => setRef(i, 'chords', el)}
+                value={line.chords}
+                onChange={(e) => updateLine(i, 'chords', e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, i, 'chords')}
+                placeholder="acordes..."
+                className="chord-line w-full bg-transparent border-0 border-b border-dashed border-accent/20 focus:border-accent/50 focus:outline-none placeholder:opacity-30 pb-0.5"
+              />
+              <input
+                ref={(el) => setRef(i, 'lyrics', el)}
+                value={line.lyrics}
+                onChange={(e) => updateLine(i, 'lyrics', e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, i, 'lyrics')}
+                placeholder="letra..."
+                className="lyric-line w-full bg-transparent border-0 border-b border-dashed border-border/30 focus:border-border/60 focus:outline-none placeholder:text-subtle placeholder:opacity-50 pb-0.5 mt-0.5"
+              />
+              <button
+                onClick={() => deleteLine(i)}
+                disabled={block.lines.length <= 1}
+                className="absolute right-0 top-2 p-0.5 text-transparent group-hover/line:text-subtle/50 hover:!text-danger disabled:!opacity-0 transition-colors cursor-pointer"
+                title="Remover linha"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+
+            {/* Split button — between lines, hidden until hover */}
+            {i < block.lines.length - 1 && (
+              <div className="group/split flex items-center gap-1.5 my-0.5 opacity-0 hover:opacity-100 transition-opacity">
+                <div className="flex-1 h-px bg-border/40" />
+                <button
+                  onClick={() => onSplitAt(i)}
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-subtle hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                  title="Dividir bloco aqui"
+                >
+                  <Scissors className="w-3 h-3" />
+                  dividir
+                </button>
+                <div className="flex-1 h-px bg-border/40" />
+              </div>
+            )}
           </div>
         ))}
       </div>
 
       {/* ── Add line ── */}
       <button
-        onClick={() => onChange({ ...block, lines: [...block.lines, { chords: '', lyrics: '' }] })}
+        onClick={() => {
+          const idx = block.lines.length - 1;
+          insertLineAfter(idx);
+        }}
         className="mt-2 flex items-center gap-1 text-[11px] text-accent/50 hover:text-accent transition-colors cursor-pointer"
       >
         <Plus className="w-3 h-3" />
@@ -321,6 +380,26 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
     onChange(next);
   }
 
+  function splitBlock(id: string, afterLineIdx: number) {
+    const idx = blocks.findIndex((b) => b.id === id);
+    if (idx === -1) return;
+    const block = blocks[idx];
+    const firstLines = block.lines.slice(0, afterLineIdx + 1);
+    const secondLines = block.lines.slice(afterLineIdx + 1);
+    if (secondLines.length === 0) return;
+    const firstBlock: ChordBlock = { ...block, lines: firstLines };
+    const secondBlock: ChordBlock = {
+      ...block,
+      id: newBlockId(),
+      lines: secondLines,
+      directions: [],
+      label: block.label,
+    };
+    const next = [...blocks];
+    next.splice(idx, 1, firstBlock, secondBlock);
+    onChange(next);
+  }
+
   return (
     <div>
       <p className="text-[10px] font-bold uppercase tracking-widest text-accent mb-3">
@@ -338,6 +417,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
           onDuplicate={() => duplicateBlock(block.id)}
           onMoveUp={() => moveBlock(block.id, 'up')}
           onMoveDown={() => moveBlock(block.id, 'down')}
+          onSplitAt={(afterLineIdx) => splitBlock(block.id, afterLineIdx)}
         />
       ))}
 
