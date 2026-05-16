@@ -59,6 +59,183 @@ const blockTypeStyles: Record<BlockType, string> = {
   interlude: 'block-intro', outro: 'block-intro', tag: 'block-verse',
 };
 
+// ── Chord token system ────────────────────────────────────────
+// Chords are stored as a plain string ("Em   G  D") but edited as
+// independent tokens so moving one chord never disturbs the others.
+
+interface ChordToken {
+  id: string;
+  text: string;
+  pos: number; // column index in the output string
+}
+
+function parseChordsToTokens(chords: string): ChordToken[] {
+  if (!chords.trim()) return [];
+  const tokens: ChordToken[] = [];
+  const regex = /\S+/g;
+  let match;
+  while ((match = regex.exec(chords)) !== null) {
+    tokens.push({ id: `t${match.index}`, text: match[0], pos: match.index });
+  }
+  return tokens;
+}
+
+function tokensToString(tokens: ChordToken[]): string {
+  if (tokens.length === 0) return '';
+  const sorted = [...tokens].sort((a, b) => a.pos - b.pos);
+  let result = '';
+  for (const token of sorted) {
+    // Guarantee no overlap: place at whichever is further right
+    const start = Math.max(result.length > 0 ? result.length + 1 : 0, token.pos);
+    while (result.length < start) result += ' ';
+    result += token.text;
+  }
+  return result;
+}
+
+// ── ChordTokenEditor ──────────────────────────────────────────
+
+interface ChordTokenEditorProps {
+  chords: string;
+  onChange: (chords: string) => void;
+}
+
+function ChordTokenEditor({ chords, onChange }: ChordTokenEditorProps) {
+  const [tokens, setTokens] = useState<ChordToken[]>(() => parseChordsToTokens(chords));
+  const [editingId, setEditingId] = useState<string | null>(null);
+  // Prevents re-parsing from parent when the change came from us
+  const isOwnChange = useRef(false);
+
+  useEffect(() => {
+    if (isOwnChange.current) { isOwnChange.current = false; return; }
+    setTokens(parseChordsToTokens(chords));
+  }, [chords]);
+
+  function emit(newTokens: ChordToken[]) {
+    setTokens(newTokens);
+    isOwnChange.current = true;
+    onChange(tokensToString(newTokens));
+  }
+
+  function updateText(id: string, text: string) {
+    emit(tokens.map(t => t.id === id ? { ...t, text } : t));
+  }
+
+  function move(id: string, delta: number) {
+    emit(tokens.map(t => t.id === id ? { ...t, pos: Math.max(0, t.pos + delta) } : t));
+  }
+
+  function remove(id: string) {
+    emit(tokens.filter(t => t.id !== id));
+  }
+
+  function addChord() {
+    const lastEnd = tokens.length > 0
+      ? Math.max(...tokens.map(t => t.pos + t.text.length)) + 2
+      : 0;
+    const newToken: ChordToken = { id: `t${Date.now()}`, text: 'Am', pos: lastEnd };
+    const next = [...tokens, newToken];
+    setTokens(next);
+    setEditingId(newToken.id);
+    isOwnChange.current = true;
+    onChange(tokensToString(next));
+  }
+
+  const sorted = [...tokens].sort((a, b) => a.pos - b.pos);
+  const preview = tokensToString(tokens);
+
+  return (
+    <div className="border-b border-dashed border-accent/20 pb-1 mb-0.5">
+      {/* ── Chips ── */}
+      <div className="flex items-center gap-1 flex-wrap min-h-[26px] py-0.5">
+        {sorted.length === 0 && (
+          <span className="text-[11px] text-subtle/40 select-none italic">sem cifra</span>
+        )}
+
+        {sorted.map(token => (
+          <span
+            key={token.id}
+            className="inline-flex items-center bg-accent/10 border border-accent/25 rounded text-accent overflow-hidden"
+          >
+            {/* Move left */}
+            <button
+              onClick={() => move(token.id, -1)}
+              className="px-1 py-0.5 text-[10px] text-accent/50 hover:text-accent hover:bg-accent/20 transition-colors cursor-pointer select-none"
+              title={`Mover para esquerda (col ${token.pos} → ${token.pos - 1})`}
+            >◄</button>
+
+            {/* Chord text — click to edit */}
+            {editingId === token.id ? (
+              <input
+                autoFocus
+                value={token.text}
+                onChange={e => updateText(token.id, e.target.value)}
+                onBlur={() => {
+                  setEditingId(null);
+                  if (!token.text.trim()) remove(token.id);
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setEditingId(null);
+                    if (!token.text.trim()) remove(token.id);
+                  } else {
+                    e.stopPropagation();
+                  }
+                }}
+                className="chord-line bg-transparent border-0 focus:outline-none text-center px-0.5 py-0.5"
+                style={{ width: `${Math.max((token.text.length || 1) + 1, 3)}ch` }}
+              />
+            ) : (
+              <button
+                onClick={() => setEditingId(token.id)}
+                className="chord-line px-1 py-0.5 cursor-pointer min-w-[2ch] text-center hover:opacity-70 transition-opacity"
+                title={`Clique para editar · coluna ${token.pos}`}
+              >
+                {token.text}
+              </button>
+            )}
+
+            {/* Move right */}
+            <button
+              onClick={() => move(token.id, 1)}
+              className="px-1 py-0.5 text-[10px] text-accent/50 hover:text-accent hover:bg-accent/20 transition-colors cursor-pointer select-none"
+              title={`Mover para direita (col ${token.pos} → ${token.pos + 1})`}
+            >►</button>
+
+            {/* Remove */}
+            <button
+              onClick={() => remove(token.id)}
+              className="pr-0.5 pl-0 py-0.5 text-accent/40 hover:text-danger transition-colors cursor-pointer"
+              title="Remover acorde"
+            >
+              <XIcon className="w-2.5 h-2.5" />
+            </button>
+          </span>
+        ))}
+
+        {/* Add chord */}
+        <button
+          onClick={addChord}
+          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] text-accent/50 hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+          title="Adicionar acorde"
+        >
+          <Plus className="w-3 h-3" />
+          acorde
+        </button>
+      </div>
+
+      {/* ── Monospace preview — shows the assembled string for visual alignment ── */}
+      {preview && (
+        <div className="chord-line text-accent/50 text-[11px] whitespace-pre overflow-x-auto leading-none pb-0.5">
+          {preview}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── DirectionsEditor ──────────────────────────────────────────
 
 interface DirectionsEditorProps {
@@ -71,7 +248,7 @@ function DirectionsEditor({ directions, onChange }: DirectionsEditorProps) {
   const [customLabel, setCustomLabel] = useState('');
 
   function addDirection(type: StageDirection) {
-    if (type === 'custom') return; // handled separately
+    if (type === 'custom') return;
     const opt = DIRECTION_OPTIONS.find((o) => o.value === type)!;
     onChange([...directions, { type, label: opt.label }]);
     setShowPicker(false);
@@ -91,7 +268,6 @@ function DirectionsEditor({ directions, onChange }: DirectionsEditorProps) {
   return (
     <div className="mt-2 pt-2 border-t border-dashed border-border/60">
       <div className="flex items-center gap-1.5 flex-wrap">
-        {/* Existing pills */}
         {directions.map((dir, i) => {
           const Icon = directionIcons[dir.type] || Zap;
           const isWarning = ['silencio', 'decrescendo'].includes(dir.type);
@@ -106,19 +282,16 @@ function DirectionsEditor({ directions, onChange }: DirectionsEditorProps) {
             </span>
           );
         })}
-
-        {/* + direção button */}
         <button
           onClick={() => setShowPicker(!showPicker)}
           className="stage-pill cursor-pointer hover:opacity-80 transition-opacity gap-1"
-          title="Adicionar direção de palco (crescendo, a cappella, etc.)"
+          title="Adicionar direção de palco"
         >
           <Plus className="w-3 h-3" />
           <span>direção</span>
         </button>
       </div>
 
-      {/* Quick-pick grid */}
       {showPicker && (
         <div className="mt-2 p-2 bg-elevated rounded-lg border border-border space-y-2">
           <div className="flex flex-wrap gap-1.5">
@@ -136,7 +309,6 @@ function DirectionsEditor({ directions, onChange }: DirectionsEditorProps) {
               );
             })}
           </div>
-          {/* Custom */}
           <div className="flex gap-2 items-center">
             <input
               value={customLabel}
@@ -145,9 +317,7 @@ function DirectionsEditor({ directions, onChange }: DirectionsEditorProps) {
               className="flex-1 px-2 py-1 bg-card border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50"
               onKeyDown={(e) => { if (e.key === 'Enter') addCustom(); if (e.key === 'Escape') setShowPicker(false); }}
             />
-            <button onClick={addCustom} className="px-2 py-1 bg-accent text-white rounded-md text-xs font-semibold hover:bg-accent/90 cursor-pointer">
-              +
-            </button>
+            <button onClick={addCustom} className="px-2 py-1 bg-accent text-white rounded-md text-xs font-semibold hover:bg-accent/90 cursor-pointer">+</button>
           </div>
         </div>
       )}
@@ -173,22 +343,14 @@ function BlockCard({
   block, isFirst, isLast,
   onChange, onDelete, onDuplicate, onMoveUp, onMoveDown, onSplitAt,
 }: BlockCardProps) {
-  // Track which line/field should receive focus after a state update
-  const [pendingFocus, setPendingFocus] = useState<{ idx: number; field: 'chords' | 'lyrics' } | null>(null);
-  const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const [pendingFocus, setPendingFocus] = useState<number | null>(null);
+  const lyricsRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
   useEffect(() => {
-    if (!pendingFocus) return;
-    const key = `${pendingFocus.idx}-${pendingFocus.field}`;
-    inputRefs.current.get(key)?.focus();
+    if (pendingFocus === null) return;
+    lyricsRefs.current.get(pendingFocus)?.focus();
     setPendingFocus(null);
   }, [pendingFocus, block.lines.length]);
-
-  function setRef(idx: number, field: 'chords' | 'lyrics', el: HTMLInputElement | null) {
-    const key = `${idx}-${field}`;
-    if (el) inputRefs.current.set(key, el);
-    else inputRefs.current.delete(key);
-  }
 
   function updateLine(idx: number, field: keyof ChordLine, value: string) {
     onChange({ ...block, lines: block.lines.map((l, i) => (i === idx ? { ...l, [field]: value } : l)) });
@@ -198,25 +360,12 @@ function BlockCard({
     const next = [...block.lines];
     next.splice(idx + 1, 0, { chords: '', lyrics: '' });
     onChange({ ...block, lines: next });
-    setPendingFocus({ idx: idx + 1, field: 'lyrics' });
+    setPendingFocus(idx + 1);
   }
 
   function deleteLine(idx: number) {
     if (block.lines.length <= 1) return;
     onChange({ ...block, lines: block.lines.filter((_, i) => i !== idx) });
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>, idx: number, field: 'chords' | 'lyrics') {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (field === 'chords') {
-        // Move to lyrics of same line
-        setPendingFocus({ idx, field: 'lyrics' });
-      } else {
-        // Insert new line below and focus its lyrics
-        insertLineAfter(idx);
-      }
-    }
   }
 
   const blockStyle = blockTypeStyles[block.type] ?? 'block-verse';
@@ -276,37 +425,39 @@ function BlockCard({
       <div className="space-y-0">
         {block.lines.map((line, i) => (
           <div key={i}>
-            {/* Line inputs */}
             <div className="group/line relative pr-6">
-              <input
-                ref={(el) => setRef(i, 'chords', el)}
-                value={line.chords}
-                onChange={(e) => updateLine(i, 'chords', e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, i, 'chords')}
-                placeholder="acordes..."
-                className="chord-line w-full bg-transparent border-0 border-b border-dashed border-accent/20 focus:border-accent/50 focus:outline-none placeholder:opacity-30 pb-0.5"
+              {/* Chord chip editor */}
+              <ChordTokenEditor
+                chords={line.chords}
+                onChange={(chords) => updateLine(i, 'chords', chords)}
               />
+              {/* Lyric input */}
               <input
-                ref={(el) => setRef(i, 'lyrics', el)}
+                ref={(el) => {
+                  if (el) lyricsRefs.current.set(i, el);
+                  else lyricsRefs.current.delete(i);
+                }}
                 value={line.lyrics}
                 onChange={(e) => updateLine(i, 'lyrics', e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, i, 'lyrics')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); insertLineAfter(i); }
+                }}
                 placeholder="letra..."
                 className="lyric-line w-full bg-transparent border-0 border-b border-dashed border-border/30 focus:border-border/60 focus:outline-none placeholder:text-subtle placeholder:opacity-50 pb-0.5 mt-0.5"
               />
               <button
                 onClick={() => deleteLine(i)}
                 disabled={block.lines.length <= 1}
-                className="absolute right-0 top-2 p-0.5 text-transparent group-hover/line:text-subtle/50 hover:!text-danger disabled:!opacity-0 transition-colors cursor-pointer"
+                className="absolute right-0 top-1 p-0.5 text-transparent group-hover/line:text-subtle/50 hover:!text-danger disabled:!opacity-0 transition-colors cursor-pointer"
                 title="Remover linha"
               >
                 <Trash2 className="w-3 h-3" />
               </button>
             </div>
 
-            {/* Split button — between lines, hidden until hover */}
+            {/* Split button — appears on hover between lines */}
             {i < block.lines.length - 1 && (
-              <div className="group/split flex items-center gap-1.5 my-0.5 opacity-0 hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1.5 my-0.5 opacity-0 hover:opacity-100 transition-opacity">
                 <div className="flex-1 h-px bg-border/40" />
                 <button
                   onClick={() => onSplitAt(i)}
@@ -325,10 +476,7 @@ function BlockCard({
 
       {/* ── Add line ── */}
       <button
-        onClick={() => {
-          const idx = block.lines.length - 1;
-          insertLineAfter(idx);
-        }}
+        onClick={() => insertLineAfter(block.lines.length - 1)}
         className="mt-2 flex items-center gap-1 text-[11px] text-accent/50 hover:text-accent transition-colors cursor-pointer"
       >
         <Plus className="w-3 h-3" />
@@ -388,13 +536,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
     const secondLines = block.lines.slice(afterLineIdx + 1);
     if (secondLines.length === 0) return;
     const firstBlock: ChordBlock = { ...block, lines: firstLines };
-    const secondBlock: ChordBlock = {
-      ...block,
-      id: newBlockId(),
-      lines: secondLines,
-      directions: [],
-      label: block.label,
-    };
+    const secondBlock: ChordBlock = { ...block, id: newBlockId(), lines: secondLines, directions: [] };
     const next = [...blocks];
     next.splice(idx, 1, firstBlock, secondBlock);
     onChange(next);
