@@ -221,7 +221,7 @@ function InlineChordEditor({ chords, onChange }: InlineChordEditorProps) {
       {/* Chord area — chips at exact column positions */}
       <div
         onClick={onAreaClick}
-        className="relative overflow-x-auto border-b border-dashed border-accent/20"
+        className="relative border-b border-dashed border-accent/20"
         style={{ minHeight: '1.6rem', cursor: 'crosshair' }}
         title="Clique para adicionar cifra"
       >
@@ -437,16 +437,23 @@ function BlockCard({
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
-          <span className="stage-pill">
-            <Repeat className="w-3 h-3" />
-            <input
-              type="number" min={1} max={10}
-              value={block.repeatCount}
-              onChange={(e) => onChange({ ...block, repeatCount: parseInt(e.target.value) || 1 })}
-              className="w-5 bg-transparent border-0 focus:outline-none text-center p-0 text-[11px]"
-              title="Repetições"
-            />
-            <span className="text-[11px]">x</span>
+          <span className="inline-flex items-center gap-0.5 bg-accent/10 rounded-full px-1.5 py-0.5">
+            <Repeat className="w-3 h-3 text-accent" />
+            <button
+              onClick={() => onChange({ ...block, repeatCount: Math.max(1, block.repeatCount - 1) })}
+              disabled={block.repeatCount <= 1}
+              className="w-4 h-4 flex items-center justify-center text-accent/60 hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer rounded text-sm leading-none font-bold"
+              title="Menos repetições"
+            >−</button>
+            <span className="text-[11px] font-semibold text-accent tabular-nums w-4 text-center select-none">
+              {block.repeatCount}x
+            </span>
+            <button
+              onClick={() => onChange({ ...block, repeatCount: Math.min(10, block.repeatCount + 1) })}
+              disabled={block.repeatCount >= 10}
+              className="w-4 h-4 flex items-center justify-center text-accent/60 hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer rounded text-sm leading-none font-bold"
+              title="Mais repetições"
+            >+</button>
           </span>
         </div>
 
