@@ -299,34 +299,49 @@ function DirectionsEditor({ directions, onChange }: DirectionsEditorProps) {
   }
 
   return (
-    <div className="mt-2 pt-2 border-t border-dashed border-border/60">
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {directions.map((dir, i) => {
-          const Icon = directionIcons[dir.type] || Zap;
-          const isWarning = ['silencio', 'decrescendo'].includes(dir.type);
-          const isInfo    = ['solo_instrumento', 'custom'].includes(dir.type);
-          return (
-            <span key={i} className={`stage-pill pr-1 ${isWarning ? 'stage-pill--warning' : isInfo ? 'stage-pill--info' : ''}`}>
-              <Icon className="w-3 h-3" />
-              {dir.label}
-              <button onClick={() => removeDirection(i)} className="ml-1 hover:opacity-60 cursor-pointer" title="Remover">
-                <XIcon className="w-2.5 h-2.5" />
-              </button>
-            </span>
-          );
-        })}
+    <div className="mt-3 pt-2.5 border-t border-border/50">
+      {/* Section header */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-subtle flex items-center gap-1.5">
+          <Zap className="w-3 h-3" />
+          Dinâmica do bloco
+        </span>
         <button
           onClick={() => setShowPicker(!showPicker)}
-          className="stage-pill cursor-pointer hover:opacity-80 transition-opacity gap-1"
-          title="Adicionar direção de palco"
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-colors cursor-pointer
+            ${showPicker
+              ? 'bg-accent text-white'
+              : 'bg-accent/10 text-accent hover:bg-accent/20'}`}
+          title="Adicionar crescendo, solo, palmas, silêncio..."
         >
           <Plus className="w-3 h-3" />
-          <span>direção</span>
+          {directions.length === 0 ? 'crescendo, solo...' : 'adicionar'}
         </button>
       </div>
 
+      {/* Active direction pills */}
+      {directions.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap mb-2">
+          {directions.map((dir, i) => {
+            const Icon = directionIcons[dir.type] || Zap;
+            const isWarning = ['silencio', 'decrescendo'].includes(dir.type);
+            const isInfo    = ['solo_instrumento', 'custom'].includes(dir.type);
+            return (
+              <span key={i} className={`stage-pill pr-1 ${isWarning ? 'stage-pill--warning' : isInfo ? 'stage-pill--info' : ''}`}>
+                <Icon className="w-3 h-3" />
+                {dir.label}
+                <button onClick={() => removeDirection(i)} className="ml-1 hover:opacity-60 cursor-pointer" title="Remover">
+                  <XIcon className="w-2.5 h-2.5" />
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+
       {showPicker && (
-        <div className="mt-2 p-2 bg-elevated rounded-lg border border-border space-y-2">
+        <div className="p-3 bg-elevated rounded-xl border border-border space-y-2.5">
+          <p className="text-[10px] text-subtle font-medium">Escolha uma direção de palco:</p>
           <div className="flex flex-wrap gap-1.5">
             {DIRECTION_OPTIONS.filter((o) => o.value !== 'custom').map((opt) => {
               const Icon = opt.icon;
@@ -339,13 +354,15 @@ function DirectionsEditor({ directions, onChange }: DirectionsEditorProps) {
               );
             })}
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center pt-1 border-t border-border/40">
             <input value={customLabel} onChange={(e) => setCustomLabel(e.target.value)}
-              placeholder="Personalizado..."
-              className="flex-1 px-2 py-1 bg-card border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50"
+              placeholder="Personalizado (ex: só vozes femininas)..."
+              className="flex-1 px-2.5 py-1.5 bg-card border border-border rounded-lg text-xs text-foreground focus:outline-none focus:border-accent/50"
               onKeyDown={(e) => { if (e.key === 'Enter') addCustom(); if (e.key === 'Escape') setShowPicker(false); }}
             />
-            <button onClick={addCustom} className="px-2 py-1 bg-accent text-white rounded-md text-xs font-semibold hover:bg-accent/90 cursor-pointer">+</button>
+            <button onClick={addCustom} className="px-3 py-1.5 bg-accent text-white rounded-lg text-xs font-semibold hover:bg-accent/90 cursor-pointer shrink-0">
+              + Adicionar
+            </button>
           </div>
         </div>
       )}

@@ -269,6 +269,11 @@ body {
   100% { background-position: 200% 0; }
 }
 
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
 @keyframes pulse-glow {
   0%, 100% { box-shadow: 0 0 0 0 rgba(0, 176, 239, 0.3); }
   50% { box-shadow: 0 0 20px 4px rgba(0, 176, 239, 0.18); }
@@ -359,10 +364,17 @@ body {
   padding-bottom: max(8px, env(safe-area-inset-bottom));
 }
 
-/* Mobile main content: clear bottom tab bar (56px) + safe area */
+/* Mobile main content: clear top bar (56px) + bottom tab bar (56px) + safe area */
 @media (max-width: 767px) {
   main {
     padding-bottom: calc(56px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Mobile: ensure top bar doesn't clip fixed children */
+@media (max-width: 767px) {
+  .glass-strong.sticky {
+    top: 56px !important;
   }
 }
 

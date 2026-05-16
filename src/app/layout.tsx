@@ -39,7 +39,7 @@ export default function RootLayout({
         <AuthProvider>
           <Sidebar />
           {/* Main Content */}
-          <main className="flex-1 md:ml-[280px] md:transition-[margin] md:duration-300 pb-16 md:pb-0 min-h-screen min-w-0 overflow-x-hidden">
+          <main className="flex-1 md:ml-[280px] md:transition-[margin] md:duration-300 pt-14 md:pt-0 pb-16 md:pb-0 min-h-screen min-w-0 overflow-x-hidden">
             {children}
           </main>
           <InstallBanner />

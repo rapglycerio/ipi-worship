@@ -22,6 +22,7 @@ import {
   MoreHorizontal,
   UserCog,
   ChevronRight,
+  Menu,
 } from 'lucide-react';
 
 // Desktop nav items (full list)
@@ -39,7 +40,7 @@ const bottomTabItems = [
   { href: '/',         label: 'Semana',   icon: ListMusic },
   { href: '/musicas',  label: 'Músicas',  icon: Library },
   { href: '/playlists',label: 'Playlists',icon: Music },
-  { href: '/importar', label: 'Importar', icon: Upload },
+  { href: '/busca',    label: 'Busca',    icon: Search },
 ];
 
 // Items shown in the "Mais" bottom sheet
@@ -55,6 +56,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [showMais, setShowMais] = useState(false);
+  const [showDrawer, setShowDrawer] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDark, setIsDark] = useState(true);
 
@@ -65,6 +67,9 @@ export default function Sidebar() {
       document.documentElement.dataset.sidebar = 'collapsed';
     }
   }, []);
+
+  // Close drawer on route change
+  useEffect(() => { setShowDrawer(false); }, [pathname]);
 
   const toggleCollapsed = () => {
     const next = !isCollapsed;
@@ -88,8 +93,160 @@ export default function Sidebar() {
     return pathname === href || pathname.startsWith(href + '/');
   }
 
+  // Shared nav link renderer (used in both desktop sidebar and mobile drawer)
+  function NavLink({ item, onClick }: { item: typeof navItems[0]; onClick?: () => void }) {
+    const Icon = item.icon;
+    const active = isActive(item.href);
+    return (
+      <Link
+        href={item.href}
+        onClick={onClick}
+        className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer min-h-[44px]
+          ${active ? 'bg-accent-subtle text-accent' : 'text-foreground hover:bg-elevated'}`}
+      >
+        <Icon className={`w-5 h-5 shrink-0 ${active ? 'text-accent' : 'text-muted'}`} />
+        {item.label}
+        {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-accent" />}
+      </Link>
+    );
+  }
+
   return (
     <>
+      {/* ── Mobile Top Bar ─────────────────────────────────────── */}
+      <header className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 flex items-center px-3 gap-3 bg-card border-b border-border no-print">
+        <button
+          onClick={() => setShowDrawer(true)}
+          className="w-11 h-11 flex items-center justify-center rounded-xl text-muted hover:bg-elevated transition-colors cursor-pointer shrink-0"
+          aria-label="Abrir menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center shrink-0">
+            <Music className="w-4 h-4 text-white" />
+          </div>
+          <span className="text-sm font-bold text-foreground truncate">IPI do Imirim</span>
+        </div>
+        <Link
+          href="/busca"
+          className="w-11 h-11 flex items-center justify-center rounded-xl text-muted hover:bg-elevated transition-colors cursor-pointer shrink-0"
+          aria-label="Buscar músicas"
+        >
+          <Search className="w-5 h-5" />
+        </Link>
+      </header>
+
+      {/* ── Mobile Drawer ──────────────────────────────────────── */}
+      {showDrawer && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-50 bg-black/60 md:hidden"
+            onClick={() => setShowDrawer(false)}
+          />
+          {/* Drawer panel */}
+          <div className="fixed top-0 left-0 bottom-0 z-50 w-[280px] md:hidden bg-card flex flex-col shadow-2xl animate-slide-up"
+            style={{ animation: 'slideIn 250ms ease-out forwards' }}
+          >
+            {/* Drawer header */}
+            <div className="flex items-center h-14 border-b border-border px-3 gap-2 shrink-0">
+              <div className="w-8 h-8 rounded-xl bg-accent flex items-center justify-center shrink-0">
+                <Music className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-foreground truncate">IPI do Imirim</p>
+                <p className="text-[10px] text-muted">Louvor &amp; Liturgia</p>
+              </div>
+              <button
+                onClick={() => setShowDrawer(false)}
+                className="w-11 h-11 flex items-center justify-center rounded-xl text-muted hover:bg-elevated transition-colors cursor-pointer shrink-0"
+                aria-label="Fechar menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search link */}
+            <div className="px-3 py-3">
+              <Link
+                href="/busca"
+                onClick={() => setShowDrawer(false)}
+                className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-elevated text-muted text-sm cursor-pointer hover:bg-border transition-colors min-h-[44px]"
+              >
+                <Search className="w-4 h-4 shrink-0" />
+                <span>Buscar músicas...</span>
+              </Link>
+            </div>
+
+            {/* Nav items */}
+            <div className="flex-1 overflow-y-auto px-2 py-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-subtle px-2 mb-1">Menu</p>
+              <ul className="space-y-0.5">
+                {navItems.map((item) => (
+                  <li key={item.href}>
+                    <NavLink item={item} onClick={() => setShowDrawer(false)} />
+                  </li>
+                ))}
+                {isAdmin && (
+                  <li>
+                    <NavLink
+                      item={{ href: '/usuarios', label: 'Usuários', icon: UserCog }}
+                      onClick={() => setShowDrawer(false)}
+                    />
+                  </li>
+                )}
+              </ul>
+            </div>
+
+            {/* Drawer footer */}
+            <div className="border-t border-border py-2 px-2 space-y-1 shrink-0">
+              {user && (
+                <div className="px-3 py-2 rounded-xl bg-elevated mb-1 flex items-center gap-3">
+                  {user.image && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={user.image} alt={user.name || ''} className="w-8 h-8 rounded-full shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-foreground truncate">{user.name}</p>
+                    <p className="text-[10px] text-subtle truncate">{user.email}</p>
+                  </div>
+                  {isAdmin && (
+                    <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-accent bg-accent/10 px-1.5 py-0.5 rounded shrink-0">
+                      Admin
+                    </span>
+                  )}
+                </div>
+              )}
+              <button
+                onClick={toggleTheme}
+                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm text-foreground hover:bg-elevated transition-colors cursor-pointer min-h-[44px]"
+              >
+                {isDark ? <Sun className="w-5 h-5 text-muted shrink-0" /> : <Moon className="w-5 h-5 text-muted shrink-0" />}
+                {isDark ? 'Modo Claro' : 'Modo Escuro'}
+              </button>
+              {user ? (
+                <button
+                  onClick={() => { signOut(); setShowDrawer(false); }}
+                  className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm text-muted hover:bg-elevated transition-colors cursor-pointer min-h-[44px]"
+                >
+                  <LogOut className="w-5 h-5 shrink-0" />
+                  Sair da conta
+                </button>
+              ) : (
+                <button
+                  onClick={() => { signIn('google'); setShowDrawer(false); }}
+                  className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer font-medium min-h-[44px]"
+                >
+                  <LogIn className="w-5 h-5 shrink-0" />
+                  Entrar com Google
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* ── Desktop Sidebar ── */}
       <nav
         className={`
@@ -106,7 +263,7 @@ export default function Sidebar() {
           <div className="flex items-center justify-center h-16 border-b border-border shrink-0">
             <button
               onClick={toggleCollapsed}
-              className="w-10 h-10 flex items-center justify-center rounded-lg text-muted hover:text-accent hover:bg-elevated transition-colors cursor-pointer"
+              className="w-11 h-11 flex items-center justify-center rounded-lg text-muted hover:text-accent hover:bg-elevated transition-colors cursor-pointer"
               title="Expandir menu"
             >
               <ChevronsRight className="w-5 h-5" />
@@ -123,7 +280,7 @@ export default function Sidebar() {
             </div>
             <button
               onClick={toggleCollapsed}
-              className="w-10 h-10 flex items-center justify-center rounded-lg text-muted hover:text-accent hover:bg-elevated transition-colors cursor-pointer shrink-0"
+              className="w-11 h-11 flex items-center justify-center rounded-lg text-muted hover:text-accent hover:bg-elevated transition-colors cursor-pointer shrink-0"
               title="Minimizar menu"
             >
               <ChevronsLeft className="w-4 h-4" />
@@ -314,7 +471,7 @@ export default function Sidebar() {
               <span className="text-sm font-bold text-foreground">Menu</span>
               <button
                 onClick={() => setShowMais(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-muted hover:bg-elevated cursor-pointer"
+                className="w-11 h-11 flex items-center justify-center rounded-lg text-muted hover:bg-elevated cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -330,7 +487,7 @@ export default function Sidebar() {
                     key={item.href}
                     href={item.href}
                     onClick={() => setShowMais(false)}
-                    className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer
+                    className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer min-h-[44px]
                       ${active ? 'bg-accent-subtle text-accent' : 'text-foreground hover:bg-elevated'}`}
                   >
                     <Icon className={`w-5 h-5 shrink-0 ${active ? 'text-accent' : 'text-muted'}`} />
@@ -345,7 +502,7 @@ export default function Sidebar() {
                 <Link
                   href="/usuarios"
                   onClick={() => setShowMais(false)}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer
+                  className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer min-h-[44px]
                     ${isActive('/usuarios') ? 'bg-accent-subtle text-accent' : 'text-foreground hover:bg-elevated'}`}
                 >
                   <UserCog className={`w-5 h-5 shrink-0 ${isActive('/usuarios') ? 'text-accent' : 'text-muted'}`} />
@@ -379,7 +536,7 @@ export default function Sidebar() {
 
               <button
                 onClick={toggleTheme}
-                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm text-foreground hover:bg-elevated transition-colors cursor-pointer"
+                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm text-foreground hover:bg-elevated transition-colors cursor-pointer min-h-[44px]"
               >
                 {isDark ? <Sun className="w-5 h-5 text-muted shrink-0" /> : <Moon className="w-5 h-5 text-muted shrink-0" />}
                 {isDark ? 'Modo Claro' : 'Modo Escuro'}
@@ -388,7 +545,7 @@ export default function Sidebar() {
               {user ? (
                 <button
                   onClick={() => { signOut(); setShowMais(false); }}
-                  className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm text-muted hover:bg-elevated transition-colors cursor-pointer"
+                  className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm text-muted hover:bg-elevated transition-colors cursor-pointer min-h-[44px]"
                 >
                   <LogOut className="w-5 h-5 shrink-0" />
                   Sair da conta
@@ -396,7 +553,7 @@ export default function Sidebar() {
               ) : (
                 <button
                   onClick={() => { signIn('google'); setShowMais(false); }}
-                  className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer font-medium"
+                  className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer font-medium min-h-[44px]"
                 >
                   <LogIn className="w-5 h-5 shrink-0" />
                   Entrar com Google
