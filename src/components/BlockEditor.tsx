@@ -97,10 +97,11 @@ function tokensToString(tokens: ChordToken[]): string {
 
 interface ChordTokenEditorProps {
   chords: string;
+  lyrics: string;
   onChange: (chords: string) => void;
 }
 
-function ChordTokenEditor({ chords, onChange }: ChordTokenEditorProps) {
+function ChordTokenEditor({ chords, lyrics, onChange }: ChordTokenEditorProps) {
   const [tokens, setTokens] = useState<ChordToken[]>(() => parseChordsToTokens(chords));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
@@ -290,10 +291,19 @@ function ChordTokenEditor({ chords, onChange }: ChordTokenEditorProps) {
         </button>
       </div>
 
-      {/* ── Monospace preview ── */}
-      {preview && (
-        <div className="chord-line text-accent/50 text-[11px] whitespace-pre overflow-x-auto leading-none pb-0.5">
-          {preview}
+      {/* ── Preview (tamanho real) — cifra + letra lado a lado como na visualização ── */}
+      {(preview || lyrics.trim()) && (
+        <div className="overflow-x-auto mt-1 rounded bg-elevated/50 px-2 py-1">
+          {preview && (
+            <div className="chord-line text-accent/70 whitespace-pre leading-snug">
+              {preview}
+            </div>
+          )}
+          {lyrics.trim() && (
+            <div className="lyric-line text-foreground/50 text-sm leading-snug">
+              {lyrics}
+            </div>
+          )}
         </div>
       )}
 
@@ -500,6 +510,7 @@ function BlockCard({
               {/* Chord chip editor */}
               <ChordTokenEditor
                 chords={line.chords}
+                lyrics={line.lyrics}
                 onChange={(chords) => updateLine(i, 'chords', chords)}
               />
               {/* Lyric input */}
