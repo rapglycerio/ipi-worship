@@ -43,7 +43,7 @@ const DIRECTION_OPTIONS: { value: StageDirection; label: string; icon: typeof Mi
   { value: 'solo_vozes',       label: 'Solo Vozes',        icon: Mic },
   { value: 'solo_instrumento', label: 'Solo Instrumento',  icon: Volume2 },
   { value: 'palmas',           label: 'Palmas',            icon: Hand },
-  { value: 'silencio',         label: 'Silêncio',          icon: VolumeX },
+  { value: 'silencio',         label: 'Silencio',          icon: VolumeX },
   { value: 'custom',           label: 'Personalizado',     icon: Zap },
 ];
 
@@ -60,8 +60,7 @@ const blockTypeStyles: Record<BlockType, string> = {
 };
 
 // ── Chord token system ────────────────────────────────────────
-// Chords are stored as a plain string ("Em   G  D") but edited as
-// independent tokens so moving one chord never disturbs the others.
+// Stored as plain string ("Em   G  D"), edited as independent tokens.
 
 interface ChordToken {
   id: string;
@@ -85,7 +84,6 @@ function tokensToString(tokens: ChordToken[]): string {
   const sorted = [...tokens].sort((a, b) => a.pos - b.pos);
   let result = '';
   for (const token of sorted) {
-    // Guarantee no overlap: place at whichever is further right
     const start = Math.max(result.length > 0 ? result.length + 1 : 0, token.pos);
     while (result.length < start) result += ' ';
     result += token.text;
@@ -93,245 +91,181 @@ function tokensToString(tokens: ChordToken[]): string {
   return result;
 }
 
-// ── ChordTokenEditor ──────────────────────────────────────────
+// ── InlineChordEditor ─────────────────────────────────────────
+// Chords rendered at their exact column positions (absolutely positioned)
+// directly above the lyric input — edit in place, no separate preview.
 
-interface ChordTokenEditorProps {
+interface InlineChordEditorProps {
   chords: string;
-  lyrics: string;
   onChange: (chords: string) => void;
 }
 
-function ChordTokenEditor({ chords, lyrics, onChange }: ChordTokenEditorProps) {
-  const [tokens, setTokens] = useState<ChordToken[]>(() => parseChordsToTokens(chords));
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
+function InlineChordEditor({ chords, onChange }: InlineChordEditorProps) {
+  const [tokens, setTokens]          = useState<ChordToken[]>(() => parseChordsToTokens(chords));
+  const [editingId, setEditingId]    = useState<string | null>(null);
+  const [draggingId, setDraggingId]  = useState<string | null>(null);
+  const [pendingFocus, setPending]   = useState<string | null>(null);
+  const [charWidth, setCharWidth]    = useState(8.4);
   const isOwnChange = useRef(false);
-  const chipRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-  const addBtnRef = useRef<HTMLButtonElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
-  const dragState = useRef<{
-    id: string; startX: number; startPos: number; hasMoved: boolean;
-  } | null>(null);
+  const dragState   = useRef<{ id: string; startX: number; startPos: number; hasMoved: boolean } | null>(null);
+  const rulerRef    = useRef<HTMLSpanElement>(null);
+  const chipRefs    = useRef<Map<string, HTMLButtonElement>>(new Map());
 
-  // Sync from parent when changed externally (e.g., transpose from toolbar)
+  // Measure real monospace char width from a hidden ruler span
+  useEffect(() => {
+    if (!rulerRef.current) return;
+    const w = rulerRef.current.getBoundingClientRect().width / 10;
+    if (w > 0) setCharWidth(w);
+  }, []);
+
+  // Sync from parent (e.g., transpose from toolbar)
   useEffect(() => {
     if (isOwnChange.current) { isOwnChange.current = false; return; }
     setTokens(parseChordsToTokens(chords));
   }, [chords]);
 
-  // Restore focus after remove / edit-confirm / Tab navigation
+  // Restore keyboard focus after remove / Tab nav
   useEffect(() => {
-    if (!pendingFocusId) return;
-    if (pendingFocusId === '__add__') addBtnRef.current?.focus();
-    else chipRefs.current.get(pendingFocusId)?.focus();
-    setPendingFocusId(null);
-  }, [pendingFocusId]);
+    if (!pendingFocus) return;
+    chipRefs.current.get(pendingFocus)?.focus();
+    setPending(null);
+  }, [pendingFocus]);
 
-  function emit(newTokens: ChordToken[]) {
-    setTokens(newTokens);
-    isOwnChange.current = true;
-    onChange(tokensToString(newTokens));
-  }
-
-  function updateText(id: string, text: string) {
-    emit(tokens.map(t => t.id === id ? { ...t, text } : t));
-  }
-
-  function move(id: string, delta: number) {
-    emit(tokens.map(t => t.id === id ? { ...t, pos: Math.max(0, t.pos + delta) } : t));
-  }
-
-  function remove(id: string, focusAdjacent = false) {
-    if (focusAdjacent) {
-      const sorted = [...tokens].sort((a, b) => a.pos - b.pos);
-      const idx = sorted.findIndex(t => t.id === id);
-      const nextId = sorted[idx + 1]?.id ?? sorted[idx - 1]?.id ?? '__add__';
-      setPendingFocusId(nextId);
-    }
-    emit(tokens.filter(t => t.id !== id));
-  }
-
-  function addChord() {
-    const lastEnd = tokens.length > 0
-      ? Math.max(...tokens.map(t => t.pos + t.text.length)) + 2
-      : 0;
-    const newToken: ChordToken = { id: `t${Date.now()}`, text: 'Am', pos: lastEnd };
-    const next = [...tokens, newToken];
+  function emit(next: ChordToken[]) {
     setTokens(next);
-    setEditingId(newToken.id);
     isOwnChange.current = true;
     onChange(tokensToString(next));
   }
-
-  // ── Drag (Pointer API) ──────────────────────────────────────
-  // Measures actual monospace character width from the live preview element.
-  function getCharWidth(): number {
-    if (!previewRef.current) return 8.4;
-    const text = previewRef.current.textContent ?? '';
-    if (!text.length) return 8.4;
-    return previewRef.current.getBoundingClientRect().width / text.length;
+  function updateText(id: string, text: string) {
+    emit(tokens.map(t => t.id === id ? { ...t, text } : t));
+  }
+  function moveToken(id: string, delta: number) {
+    emit(tokens.map(t => t.id === id ? { ...t, pos: Math.max(0, t.pos + delta) } : t));
+  }
+  function removeToken(id: string) {
+    const sorted = [...tokens].sort((a, b) => a.pos - b.pos);
+    const idx = sorted.findIndex(t => t.id === id);
+    const next = sorted[idx + 1]?.id ?? sorted[idx - 1]?.id;
+    emit(tokens.filter(t => t.id !== id));
+    if (next) setPending(next);
+  }
+  function addChordAt(pos: number) {
+    const t: ChordToken = { id: `t${Date.now()}`, text: 'Am', pos: Math.max(0, pos) };
+    const next = [...tokens, t];
+    setTokens(next); setEditingId(t.id);
+    isOwnChange.current = true; onChange(tokensToString(next));
   }
 
-  function handlePointerDown(e: React.PointerEvent<HTMLButtonElement>, token: ChordToken) {
+  // ── Drag (Pointer API + setPointerCapture) ───────────────────
+  function onPtrDown(e: React.PointerEvent<HTMLButtonElement>, t: ChordToken) {
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    dragState.current = { id: token.id, startX: e.clientX, startPos: token.pos, hasMoved: false };
+    dragState.current = { id: t.id, startX: e.clientX, startPos: t.pos, hasMoved: false };
+  }
+  function onPtrMove(e: React.PointerEvent<HTMLButtonElement>, t: ChordToken) {
+    const d = dragState.current;
+    if (!d || d.id !== t.id) return;
+    const dx = e.clientX - d.startX;
+    if (Math.abs(dx) > 5) { d.hasMoved = true; setDraggingId(t.id); }
+    if (!d.hasMoved) return;
+    const newPos = Math.max(0, d.startPos + Math.round(dx / charWidth));
+    setTokens(prev => prev.map(tk => tk.id === d.id ? { ...tk, pos: newPos } : tk));
+  }
+  function onPtrUp(e: React.PointerEvent<HTMLButtonElement>, t: ChordToken) {
+    const d = dragState.current;
+    if (!d || d.id !== t.id) return;
+    const wasDrag = d.hasMoved;
+    dragState.current = null; setDraggingId(null);
+    if (!wasDrag) { setEditingId(t.id); return; }
+    setTokens(prev => { isOwnChange.current = true; onChange(tokensToString(prev)); return prev; });
   }
 
-  function handlePointerMove(e: React.PointerEvent<HTMLButtonElement>, token: ChordToken) {
-    const drag = dragState.current;
-    if (!drag || drag.id !== token.id) return;
-    const deltaX = e.clientX - drag.startX;
-    if (Math.abs(deltaX) > 5) {
-      drag.hasMoved = true;
-      setDraggingId(token.id);
-    }
-    if (!drag.hasMoved) return;
-    const charW = getCharWidth();
-    const newPos = Math.max(0, drag.startPos + Math.round(deltaX / charW));
-    // Update local state live (no parent emit yet — wait for pointerUp)
-    setTokens(prev => prev.map(t => t.id === drag.id ? { ...t, pos: newPos } : t));
-  }
-
-  function handlePointerUp(e: React.PointerEvent<HTMLButtonElement>, token: ChordToken) {
-    const drag = dragState.current;
-    if (!drag || drag.id !== token.id) return;
-    const wasDrag = drag.hasMoved;
-    dragState.current = null;
-    setDraggingId(null);
-    if (!wasDrag) {
-      // Pure click → enter text-edit mode
-      setEditingId(token.id);
-      return;
-    }
-    // Drag finished → emit final position to parent
-    setTokens(prev => {
-      isOwnChange.current = true;
-      onChange(tokensToString(prev));
-      return prev;
-    });
-  }
-
-  // ── Keyboard (chip button) ──────────────────────────────────
-  function handleChipKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, token: ChordToken) {
+  // ── Keyboard ─────────────────────────────────────────────────
+  function onChipKey(e: React.KeyboardEvent<HTMLButtonElement>, t: ChordToken) {
     switch (e.key) {
-      case 'ArrowLeft':  e.preventDefault(); e.stopPropagation(); move(token.id, e.shiftKey ? -5 : -1); break;
-      case 'ArrowRight': e.preventDefault(); e.stopPropagation(); move(token.id, e.shiftKey ?  5 :  1); break;
-      case 'Enter': case 'F2': e.preventDefault(); e.stopPropagation(); setEditingId(token.id); break;
-      case 'Delete': case 'Backspace': e.preventDefault(); e.stopPropagation(); remove(token.id, true); break;
+      case 'ArrowLeft':  e.preventDefault(); e.stopPropagation(); moveToken(t.id, e.shiftKey ? -5 : -1); break;
+      case 'ArrowRight': e.preventDefault(); e.stopPropagation(); moveToken(t.id, e.shiftKey ?  5 :  1); break;
+      case 'Enter': case 'F2':           e.preventDefault(); e.stopPropagation(); setEditingId(t.id); break;
+      case 'Delete': case 'Backspace':   e.preventDefault(); e.stopPropagation(); removeToken(t.id);  break;
     }
   }
-
-  // ── Keyboard (text input) ───────────────────────────────────
-  function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>, token: ChordToken) {
+  function onInputKey(e: React.KeyboardEvent<HTMLInputElement>, t: ChordToken) {
     const sorted = [...tokens].sort((a, b) => a.pos - b.pos);
-    const idx = sorted.findIndex(t => t.id === token.id);
+    const idx = sorted.findIndex(x => x.id === t.id);
     if (e.key === 'Enter' || e.key === 'Escape') {
       e.preventDefault(); e.stopPropagation();
       setEditingId(null);
-      if (!token.text.trim()) remove(token.id); else setPendingFocusId(token.id);
+      if (!t.text.trim()) removeToken(t.id); else setPending(t.id);
     } else if (e.key === 'Tab') {
-      e.preventDefault();
-      setEditingId(null);
-      if (!token.text.trim()) remove(token.id);
-      setPendingFocusId(e.shiftKey ? (sorted[idx - 1]?.id ?? '__add__') : (sorted[idx + 1]?.id ?? '__add__'));
-    } else {
-      e.stopPropagation();
-    }
+      e.preventDefault(); setEditingId(null);
+      if (!t.text.trim()) removeToken(t.id);
+      const nextId = e.shiftKey ? sorted[idx - 1]?.id : sorted[idx + 1]?.id;
+      if (nextId) setPending(nextId);
+    } else { e.stopPropagation(); }
   }
 
-  const sorted = [...tokens].sort((a, b) => a.pos - b.pos);
-  const preview = tokensToString(tokens);
+  // Click on empty chord area → add chord at that column
+  function onAreaClick(e: React.MouseEvent<HTMLDivElement>) {
+    if ((e.target as HTMLElement).closest('button,input')) return;
+    const x = e.clientX - (e.currentTarget as HTMLElement).getBoundingClientRect().left;
+    addChordAt(Math.round(x / charWidth));
+  }
 
   return (
-    <div className="border-b border-dashed border-accent/20 pb-1 mb-0.5">
-      {/* ── Chips ── */}
-      <div className="flex items-center gap-1 flex-wrap min-h-[26px] py-0.5">
-        {sorted.length === 0 && (
-          <span className="text-[11px] text-subtle/40 select-none italic">sem cifra</span>
+    <>
+      {/* Off-screen ruler — measures exact monospace char width */}
+      <span ref={rulerRef} className="chord-line"
+        style={{ position: 'fixed', top: 0, left: -9999, opacity: 0, pointerEvents: 'none' }}
+        aria-hidden>MMMMMMMMMM</span>
+
+      {/* Chord area — chips at exact column positions */}
+      <div
+        onClick={onAreaClick}
+        className="relative overflow-x-auto border-b border-dashed border-accent/20"
+        style={{ minHeight: '1.6rem', cursor: 'crosshair' }}
+        title="Clique para adicionar cifra"
+      >
+        {tokens.length === 0 && (
+          <span className="chord-line text-accent/20 text-xs italic pointer-events-none select-none absolute top-0 left-0">
+            cifra...
+          </span>
         )}
-
-        {sorted.map(token => (
-          <span
-            key={token.id}
-            className={`inline-flex items-center border rounded text-accent overflow-hidden transition-colors
-              ${draggingId === token.id ? 'bg-accent/25 border-accent/60 shadow-sm' : 'bg-accent/10 border-accent/25'}`}
-          >
-            {/* ◄ keyboard/mouse nudge */}
-            <button tabIndex={-1} onClick={() => move(token.id, -1)}
-              className="px-1 py-0.5 text-[10px] text-accent/50 hover:text-accent hover:bg-accent/20 transition-colors cursor-pointer select-none"
-              title="Mover esquerda (ou ← no teclado)">◄</button>
-
-            {/* Chord text — drag OR click-to-edit */}
+        {tokens.map(token => (
+          <span key={token.id} className="absolute top-0 group/chip"
+            style={{ left: `${token.pos * charWidth}px` }}>
             {editingId === token.id ? (
               <input autoFocus value={token.text}
                 onChange={e => updateText(token.id, e.target.value)}
-                onBlur={() => { setEditingId(null); if (!token.text.trim()) remove(token.id); }}
-                onKeyDown={e => handleInputKeyDown(e, token)}
-                className="chord-line bg-transparent border-0 focus:outline-none text-center px-0.5 py-0.5"
-                style={{ width: `${Math.max((token.text.length || 1) + 1, 3)}ch` }}
+                onBlur={() => { setEditingId(null); if (!token.text.trim()) removeToken(token.id); }}
+                onKeyDown={e => onInputKey(e, token)}
+                className="chord-line bg-accent/15 border border-accent/50 rounded-sm focus:outline-none text-center px-0.5"
+                style={{ width: `${Math.max((token.text.length || 1) + 1, 3)}ch`, minWidth: '2ch' }}
               />
             ) : (
-              <button
-                ref={el => { if (el) chipRefs.current.set(token.id, el); else chipRefs.current.delete(token.id); }}
-                onPointerDown={e => handlePointerDown(e, token)}
-                onPointerMove={e => handlePointerMove(e, token)}
-                onPointerUp={e => handlePointerUp(e, token)}
-                onKeyDown={e => handleChipKeyDown(e, token)}
-                style={{ touchAction: 'none' }}
-                className="chord-line px-1 py-0.5 cursor-ew-resize min-w-[2ch] text-center select-none focus:outline-none focus:ring-1 focus:ring-accent rounded-sm"
-                title={`col ${token.pos}  ·  Arrastar ou ←→ mover  ·  Clique/Enter para editar  ·  Del remover`}
-              >
-                {token.text}
-              </button>
+              <span className="relative inline-flex items-start">
+                <button
+                  ref={el => { if (el) chipRefs.current.set(token.id, el); else chipRefs.current.delete(token.id); }}
+                  onPointerDown={e => onPtrDown(e, token)}
+                  onPointerMove={e => onPtrMove(e, token)}
+                  onPointerUp={e => onPtrUp(e, token)}
+                  onKeyDown={e => onChipKey(e, token)}
+                  style={{ touchAction: 'none' }}
+                  className={`chord-line select-none focus:outline-none focus:underline focus:decoration-dotted whitespace-nowrap
+                    ${draggingId === token.id ? 'opacity-50 cursor-grabbing' : 'cursor-ew-resize'}`}
+                  title={`col ${token.pos} · Arrastar · ←→ mover · Clique/Enter editar · Del remover`}
+                >{token.text}</button>
+                {/* × on chip hover */}
+                <button tabIndex={-1}
+                  onClick={e => { e.stopPropagation(); removeToken(token.id); }}
+                  className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-danger text-white text-[8px] leading-none
+                    items-center justify-center hidden group-hover/chip:flex cursor-pointer z-10"
+                  title="Remover">×</button>
+              </span>
             )}
-
-            {/* ► keyboard/mouse nudge */}
-            <button tabIndex={-1} onClick={() => move(token.id, 1)}
-              className="px-1 py-0.5 text-[10px] text-accent/50 hover:text-accent hover:bg-accent/20 transition-colors cursor-pointer select-none"
-              title="Mover direita (ou → no teclado)">►</button>
-
-            {/* × remove */}
-            <button tabIndex={-1} onClick={() => remove(token.id, true)}
-              className="pr-0.5 pl-0 py-0.5 text-accent/40 hover:text-danger transition-colors cursor-pointer"
-              title="Remover">
-              <XIcon className="w-2.5 h-2.5" />
-            </button>
           </span>
         ))}
-
-        <button ref={addBtnRef} onClick={addChord}
-          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] text-accent/50 hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/60"
-          title="Adicionar acorde">
-          <Plus className="w-3 h-3" />
-          acorde
-        </button>
       </div>
-
-      {/* ── Preview (tamanho real) — cifra + letra como na visualização ── */}
-      {(preview || lyrics.trim()) && (
-        <div className="overflow-x-auto mt-1 rounded bg-elevated/50 px-2 py-1">
-          {preview && (
-            <div ref={previewRef} className="chord-line text-accent/70 whitespace-pre leading-snug">
-              {preview}
-            </div>
-          )}
-          {lyrics.trim() && (
-            <div className="lyric-line text-foreground/50 text-sm leading-snug">
-              {lyrics}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Hint ── */}
-      {sorted.length > 0 && (
-        <p className="text-[9px] text-subtle/35 mt-0.5 select-none leading-none">
-          Arrastar · Tab navegar · ←/→ mover · Shift+←/→ ×5 · Clique/Enter editar · Del remover
-        </p>
-      )}
-    </div>
+    </>
   );
 }
 
@@ -397,11 +331,8 @@ function DirectionsEditor({ directions, onChange }: DirectionsEditorProps) {
             {DIRECTION_OPTIONS.filter((o) => o.value !== 'custom').map((opt) => {
               const Icon = opt.icon;
               return (
-                <button
-                  key={opt.value}
-                  onClick={() => addDirection(opt.value)}
-                  className="stage-pill cursor-pointer hover:bg-accent hover:text-white transition-colors"
-                >
+                <button key={opt.value} onClick={() => addDirection(opt.value)}
+                  className="stage-pill cursor-pointer hover:bg-accent hover:text-white transition-colors">
                   <Icon className="w-3 h-3" />
                   {opt.label}
                 </button>
@@ -409,9 +340,7 @@ function DirectionsEditor({ directions, onChange }: DirectionsEditorProps) {
             })}
           </div>
           <div className="flex gap-2 items-center">
-            <input
-              value={customLabel}
-              onChange={(e) => setCustomLabel(e.target.value)}
+            <input value={customLabel} onChange={(e) => setCustomLabel(e.target.value)}
               placeholder="Personalizado..."
               className="flex-1 px-2 py-1 bg-card border border-border rounded-md text-xs text-foreground focus:outline-none focus:border-accent/50"
               onKeyDown={(e) => { if (e.key === 'Enter') addCustom(); if (e.key === 'Escape') setShowPicker(false); }}
@@ -525,23 +454,17 @@ function BlockCard({
         {block.lines.map((line, i) => (
           <div key={i}>
             <div className="group/line relative pr-6">
-              {/* Chord chip editor */}
-              <ChordTokenEditor
+              {/* Inline chord editor — chips sit at exact positions above the lyric */}
+              <InlineChordEditor
                 chords={line.chords}
-                lyrics={line.lyrics}
                 onChange={(chords) => updateLine(i, 'chords', chords)}
               />
-              {/* Lyric input */}
+              {/* Lyric input — sits directly below, natural alignment reference */}
               <input
-                ref={(el) => {
-                  if (el) lyricsRefs.current.set(i, el);
-                  else lyricsRefs.current.delete(i);
-                }}
+                ref={(el) => { if (el) lyricsRefs.current.set(i, el); else lyricsRefs.current.delete(i); }}
                 value={line.lyrics}
                 onChange={(e) => updateLine(i, 'lyrics', e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { e.preventDefault(); insertLineAfter(i); }
-                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); insertLineAfter(i); } }}
                 placeholder="letra..."
                 className="lyric-line w-full bg-transparent border-0 border-b border-dashed border-border/30 focus:border-border/60 focus:outline-none placeholder:text-subtle placeholder:opacity-50 pb-0.5 mt-0.5"
               />
@@ -559,11 +482,9 @@ function BlockCard({
             {i < block.lines.length - 1 && (
               <div className="flex items-center gap-1.5 my-0.5 opacity-0 hover:opacity-100 transition-opacity">
                 <div className="flex-1 h-px bg-border/40" />
-                <button
-                  onClick={() => onSplitAt(i)}
+                <button onClick={() => onSplitAt(i)}
                   className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-subtle hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                  title="Dividir bloco aqui"
-                >
+                  title="Dividir bloco aqui">
                   <Scissors className="w-3 h-3" />
                   dividir
                 </button>
