@@ -103,13 +103,24 @@ interface ChordTokenEditorProps {
 function ChordTokenEditor({ chords, onChange }: ChordTokenEditorProps) {
   const [tokens, setTokens] = useState<ChordToken[]>(() => parseChordsToTokens(chords));
   const [editingId, setEditingId] = useState<string | null>(null);
-  // Prevents re-parsing from parent when the change came from us
+  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
   const isOwnChange = useRef(false);
+  const chipRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const addBtnRef = useRef<HTMLButtonElement>(null);
 
+  // Sync from parent when changed externally (e.g., undo)
   useEffect(() => {
     if (isOwnChange.current) { isOwnChange.current = false; return; }
     setTokens(parseChordsToTokens(chords));
   }, [chords]);
+
+  // Restore focus after state changes (remove, edit-confirm, Tab navigation)
+  useEffect(() => {
+    if (!pendingFocusId) return;
+    if (pendingFocusId === '__add__') addBtnRef.current?.focus();
+    else chipRefs.current.get(pendingFocusId)?.focus();
+    setPendingFocusId(null);
+  }, [pendingFocusId]);
 
   function emit(newTokens: ChordToken[]) {
     setTokens(newTokens);
@@ -125,7 +136,13 @@ function ChordTokenEditor({ chords, onChange }: ChordTokenEditorProps) {
     emit(tokens.map(t => t.id === id ? { ...t, pos: Math.max(0, t.pos + delta) } : t));
   }
 
-  function remove(id: string) {
+  function remove(id: string, focusAdjacent = false) {
+    if (focusAdjacent) {
+      const sorted = [...tokens].sort((a, b) => a.pos - b.pos);
+      const idx = sorted.findIndex(t => t.id === id);
+      const nextId = sorted[idx + 1]?.id ?? sorted[idx - 1]?.id ?? '__add__';
+      setPendingFocusId(nextId);
+    }
     emit(tokens.filter(t => t.id !== id));
   }
 
@@ -139,6 +156,56 @@ function ChordTokenEditor({ chords, onChange }: ChordTokenEditorProps) {
     setEditingId(newToken.id);
     isOwnChange.current = true;
     onChange(tokensToString(next));
+  }
+
+  // Keyboard handler for the chip button (non-edit mode)
+  function handleChipKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, token: ChordToken) {
+    const sorted = [...tokens].sort((a, b) => a.pos - b.pos);
+    const idx = sorted.findIndex(t => t.id === token.id);
+
+    switch (e.key) {
+      case 'ArrowLeft':
+        e.preventDefault(); e.stopPropagation();
+        move(token.id, e.shiftKey ? -5 : -1);
+        break;
+      case 'ArrowRight':
+        e.preventDefault(); e.stopPropagation();
+        move(token.id, e.shiftKey ? 5 : 1);
+        break;
+      case 'Enter':
+      case 'F2':
+        e.preventDefault(); e.stopPropagation();
+        setEditingId(token.id);
+        break;
+      case 'Delete':
+      case 'Backspace':
+        e.preventDefault(); e.stopPropagation();
+        remove(token.id, true);
+        break;
+    }
+  }
+
+  // Keyboard handler for the text input (edit mode)
+  function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>, token: ChordToken) {
+    const sorted = [...tokens].sort((a, b) => a.pos - b.pos);
+    const idx = sorted.findIndex(t => t.id === token.id);
+
+    if (e.key === 'Enter' || e.key === 'Escape') {
+      e.preventDefault(); e.stopPropagation();
+      setEditingId(null);
+      if (!token.text.trim()) remove(token.id);
+      else setPendingFocusId(token.id);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      setEditingId(null);
+      if (!token.text.trim()) remove(token.id);
+      const nextId = e.shiftKey
+        ? (sorted[idx - 1]?.id ?? '__add__')
+        : (sorted[idx + 1]?.id ?? '__add__');
+      setPendingFocusId(nextId);
+    } else {
+      e.stopPropagation();
+    }
   }
 
   const sorted = [...tokens].sort((a, b) => a.pos - b.pos);
@@ -157,14 +224,15 @@ function ChordTokenEditor({ chords, onChange }: ChordTokenEditorProps) {
             key={token.id}
             className="inline-flex items-center bg-accent/10 border border-accent/25 rounded text-accent overflow-hidden"
           >
-            {/* Move left */}
+            {/* ◄ mouse-only */}
             <button
+              tabIndex={-1}
               onClick={() => move(token.id, -1)}
               className="px-1 py-0.5 text-[10px] text-accent/50 hover:text-accent hover:bg-accent/20 transition-colors cursor-pointer select-none"
-              title={`Mover para esquerda (col ${token.pos} → ${token.pos - 1})`}
+              title="Mover esquerda"
             >◄</button>
 
-            {/* Chord text — click to edit */}
+            {/* Chord text — the only Tab stop in the chip */}
             {editingId === token.id ? (
               <input
                 autoFocus
@@ -174,41 +242,36 @@ function ChordTokenEditor({ chords, onChange }: ChordTokenEditorProps) {
                   setEditingId(null);
                   if (!token.text.trim()) remove(token.id);
                 }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === 'Escape') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setEditingId(null);
-                    if (!token.text.trim()) remove(token.id);
-                  } else {
-                    e.stopPropagation();
-                  }
-                }}
+                onKeyDown={e => handleInputKeyDown(e, token)}
                 className="chord-line bg-transparent border-0 focus:outline-none text-center px-0.5 py-0.5"
                 style={{ width: `${Math.max((token.text.length || 1) + 1, 3)}ch` }}
               />
             ) : (
               <button
+                ref={el => { if (el) chipRefs.current.set(token.id, el); else chipRefs.current.delete(token.id); }}
                 onClick={() => setEditingId(token.id)}
-                className="chord-line px-1 py-0.5 cursor-pointer min-w-[2ch] text-center hover:opacity-70 transition-opacity"
-                title={`Clique para editar · coluna ${token.pos}`}
+                onKeyDown={e => handleChipKeyDown(e, token)}
+                className="chord-line px-1 py-0.5 cursor-pointer min-w-[2ch] text-center hover:opacity-70 transition-opacity focus:outline-none focus:ring-1 focus:ring-accent rounded-sm"
+                title={`col ${token.pos}  ·  Enter/F2 editar  ·  ←→ mover  ·  Shift+←→ ×5  ·  Del remover`}
               >
                 {token.text}
               </button>
             )}
 
-            {/* Move right */}
+            {/* ► mouse-only */}
             <button
+              tabIndex={-1}
               onClick={() => move(token.id, 1)}
               className="px-1 py-0.5 text-[10px] text-accent/50 hover:text-accent hover:bg-accent/20 transition-colors cursor-pointer select-none"
-              title={`Mover para direita (col ${token.pos} → ${token.pos + 1})`}
+              title="Mover direita"
             >►</button>
 
-            {/* Remove */}
+            {/* × mouse-only */}
             <button
-              onClick={() => remove(token.id)}
+              tabIndex={-1}
+              onClick={() => remove(token.id, true)}
               className="pr-0.5 pl-0 py-0.5 text-accent/40 hover:text-danger transition-colors cursor-pointer"
-              title="Remover acorde"
+              title="Remover"
             >
               <XIcon className="w-2.5 h-2.5" />
             </button>
@@ -217,8 +280,9 @@ function ChordTokenEditor({ chords, onChange }: ChordTokenEditorProps) {
 
         {/* Add chord */}
         <button
+          ref={addBtnRef}
           onClick={addChord}
-          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] text-accent/50 hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] text-accent/50 hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/60"
           title="Adicionar acorde"
         >
           <Plus className="w-3 h-3" />
@@ -226,11 +290,18 @@ function ChordTokenEditor({ chords, onChange }: ChordTokenEditorProps) {
         </button>
       </div>
 
-      {/* ── Monospace preview — shows the assembled string for visual alignment ── */}
+      {/* ── Monospace preview ── */}
       {preview && (
         <div className="chord-line text-accent/50 text-[11px] whitespace-pre overflow-x-auto leading-none pb-0.5">
           {preview}
         </div>
+      )}
+
+      {/* ── Keyboard hint ── */}
+      {sorted.length > 0 && (
+        <p className="text-[9px] text-subtle/35 mt-0.5 select-none leading-none">
+          Tab navegar · ←/→ mover · Shift+←/→ ×5 · Enter editar · Del remover
+        </p>
       )}
     </div>
   );
