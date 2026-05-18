@@ -69,6 +69,7 @@ export default function PlaylistsPage() {
   const { songs } = useSongs();
   const { data: session } = useSession();
   const isAdmin = (session?.user as any)?.isAdmin === true;
+  const isLoggedIn = !!session?.user;
 
   const [tab, setTab] = useState<Tab>('upcoming');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -167,13 +168,15 @@ export default function PlaylistsPage() {
               <p className="text-xs text-muted">{playlists.length} playlist(s) salva(s)</p>
             </div>
           </div>
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent text-white text-xs font-semibold cursor-pointer hover:bg-accent/90 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Nova Playlist
-          </button>
+          {isLoggedIn && (
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent text-white text-xs font-semibold cursor-pointer hover:bg-accent/90 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Nova Playlist
+            </button>
+          )}
         </div>
 
         {/* Tabs */}
@@ -363,13 +366,15 @@ export default function PlaylistsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button
-                      onClick={(e) => openEdit(pl, e)}
-                      className="p-1.5 rounded-lg text-subtle hover:text-accent hover:bg-accent/10 transition-all cursor-pointer"
-                      aria-label="Editar playlist"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
+                    {isLoggedIn && (
+                      <button
+                        onClick={(e) => openEdit(pl, e)}
+                        className="p-1.5 rounded-lg text-subtle hover:text-accent hover:bg-accent/10 transition-all cursor-pointer"
+                        aria-label="Editar playlist"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     <ChevronRight className="w-5 h-5 text-subtle group-hover:text-accent transition-colors" />
                   </div>
                 </div>
@@ -418,16 +423,18 @@ export default function PlaylistsPage() {
         </div>
       )}
 
-      {/* Floating action button on mobile */}
-      <button
-        onClick={openCreate}
-        className="fixed bottom-20 right-4 md:hidden z-30 w-14 h-14 rounded-full bg-accent text-white shadow-lg shadow-accent/30 flex items-center justify-center cursor-pointer hover:bg-accent/90 transition-all active:scale-95"
-        style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom))' }}
-        aria-label="Nova Playlist"
-        title="Nova Playlist"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      {/* Floating action button on mobile — logged-in only */}
+      {isLoggedIn && (
+        <button
+          onClick={openCreate}
+          className="fixed bottom-20 right-4 md:hidden z-30 w-14 h-14 rounded-full bg-accent text-white shadow-lg shadow-accent/30 flex items-center justify-center cursor-pointer hover:bg-accent/90 transition-all active:scale-95"
+          style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom))' }}
+          aria-label="Nova Playlist"
+          title="Nova Playlist"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      )}
 
       {modalOpen && (
         <PlaylistModal
@@ -458,6 +465,8 @@ function PlaylistDetail({
   onEditPlaylist: (pl: Playlist) => void;
   onRefetch: () => Promise<void>;
 }) {
+  const { data: session } = useSession();
+  const isLoggedIn = !!session?.user;
   const [arrangements, setArrangements] = useState<WorshipArrangement[]>(playlist.arrangements);
   const [showAddSong, setShowAddSong] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -574,13 +583,15 @@ function PlaylistDetail({
             >
               {copied ? <Check className="w-4 h-4 text-success" /> : <Share2 className="w-4 h-4" />}
             </button>
-            <button
-              onClick={() => onEditPlaylist(playlist)}
-              className="p-2 rounded-lg text-muted hover:text-accent hover:bg-accent/10 transition-all cursor-pointer"
-              aria-label="Editar playlist"
-            >
-              <Pencil className="w-4 h-4" />
-            </button>
+            {isLoggedIn && (
+              <button
+                onClick={() => onEditPlaylist(playlist)}
+                className="p-2 rounded-lg text-muted hover:text-accent hover:bg-accent/10 transition-all cursor-pointer"
+                aria-label="Editar playlist"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -597,13 +608,15 @@ function PlaylistDetail({
               </span>
             )}
           </div>
-          <button
-            onClick={() => setShowAddSong(true)}
-            className="flex items-center gap-1.5 text-xs text-accent font-semibold hover:text-accent/80 transition-colors cursor-pointer"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            Adicionar
-          </button>
+          {isLoggedIn && (
+            <button
+              onClick={() => setShowAddSong(true)}
+              className="flex items-center gap-1.5 text-xs text-accent font-semibold hover:text-accent/80 transition-colors cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              Adicionar
+            </button>
+          )}
         </div>
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -619,6 +632,7 @@ function PlaylistDetail({
                   song={songs.find((s) => s.id === arr.masterSongId)}
                   index={i}
                   onRemove={() => handleRemove(arr.id)}
+                  canEdit={isLoggedIn}
                 />
               ))}
             </div>
@@ -660,14 +674,17 @@ function SortableItem({
   song,
   index,
   onRemove,
+  canEdit = false,
 }: {
   arrangement: WorshipArrangement;
   song: MasterSong | undefined;
   index: number;
   onRemove: () => void;
+  canEdit?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: arrangement.id,
+    disabled: !canEdit,
   });
 
   const style = {
@@ -688,14 +705,18 @@ function SortableItem({
         isDragging ? 'shadow-lg shadow-accent/10 border-accent/30 z-50' : ''
       }`}
     >
-      <button
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-subtle hover:text-muted transition-colors touch-target"
-        aria-label="Arrastar para reordenar"
-      >
-        <GripVertical className="w-4 h-4" />
-      </button>
+      {canEdit ? (
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-subtle hover:text-muted transition-colors touch-target"
+          aria-label="Arrastar para reordenar"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+      ) : (
+        <span className="w-9 shrink-0" />
+      )}
 
       <span className="text-[11px] font-bold text-subtle w-4 shrink-0 text-center">{index + 1}</span>
 
@@ -718,13 +739,15 @@ function SortableItem({
         {displayKey}
       </span>
 
-      <button
-        onClick={onRemove}
-        className="p-1.5 text-subtle hover:text-error transition-colors cursor-pointer"
-        aria-label="Remover da playlist"
-      >
-        <Trash2 className="w-3.5 h-3.5" />
-      </button>
+      {canEdit && (
+        <button
+          onClick={onRemove}
+          className="p-1.5 text-subtle hover:text-danger transition-colors cursor-pointer shrink-0"
+          aria-label="Remover da playlist"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
     </div>
   );
 }

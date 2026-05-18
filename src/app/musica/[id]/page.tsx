@@ -33,6 +33,9 @@ import {
   Lightbulb,
   CheckCircle2,
   Circle,
+  Play,
+  Pause,
+  Gauge,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -55,6 +58,71 @@ const SERVICE_TYPES = [
   { value: 'especial', label: 'Especial' },
   { value: 'estudo', label: 'Estudo' },
 ];
+
+// ── Auto-Scroller ─────────────────────────────────────────────
+
+const SPEEDS = [
+  { label: 'Lento',  px: 15 },  // px/sec
+  { label: 'Médio',  px: 35 },
+  { label: 'Rápido', px: 70 },
+];
+
+function AutoScroller() {
+  const [playing, setPlaying] = useState(false);
+  const [speedIdx, setSpeedIdx] = useState(1);
+  const rafRef = useRef<number | null>(null);
+  const lastRef = useRef<number>(0);
+  const accRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!playing) {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      return;
+    }
+    const pxPerSec = SPEEDS[speedIdx].px;
+    lastRef.current = performance.now();
+
+    function step(now: number) {
+      const dt = (now - lastRef.current) / 1000;
+      lastRef.current = now;
+      accRef.current += pxPerSec * dt;
+      const whole = Math.floor(accRef.current);
+      if (whole >= 1) {
+        window.scrollBy({ top: whole, behavior: 'instant' });
+        accRef.current -= whole;
+      }
+      rafRef.current = requestAnimationFrame(step);
+    }
+    rafRef.current = requestAnimationFrame(step);
+    return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
+  }, [playing, speedIdx]);
+
+  return (
+    <div
+      className="fixed right-3 z-30 no-print flex items-center gap-1 bg-card/90 backdrop-blur-sm border border-border rounded-full shadow-lg px-2 py-1.5"
+      style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}
+    >
+      <Gauge className="w-3.5 h-3.5 text-subtle shrink-0" />
+      {SPEEDS.map((s, i) => (
+        <button
+          key={i}
+          onClick={() => setSpeedIdx(i)}
+          className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full transition-colors cursor-pointer
+            ${speedIdx === i ? 'bg-accent/20 text-accent' : 'text-subtle hover:text-foreground'}`}
+        >{s.label}</button>
+      ))}
+      <button
+        onClick={() => setPlaying(p => !p)}
+        className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors cursor-pointer ml-0.5
+          ${playing ? 'bg-accent text-white' : 'bg-elevated text-muted hover:bg-border'}`}
+        aria-label={playing ? 'Pausar rolagem' : 'Rolar automaticamente'}
+      >
+        {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+      </button>
+    </div>
+  );
+}
 
 // ── Add to Playlist Modal ─────────────────────────────────────
 
@@ -647,6 +715,9 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
 
   return (
     <div className="min-h-screen pb-20">
+      {/* Auto-scroll widget */}
+      <AutoScroller />
+
       {/* Modals */}
       {showAddToPlaylist && (
         <AddToPlaylistModal

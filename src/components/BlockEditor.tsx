@@ -218,16 +218,16 @@ function InlineChordEditor({ chords, onChange }: InlineChordEditorProps) {
         style={{ position: 'fixed', top: 0, left: -9999, opacity: 0, pointerEvents: 'none' }}
         aria-hidden>MMMMMMMMMM</span>
 
-      {/* Chord area — chips at exact column positions */}
+      {/* Chord area — chips at exact column positions; double-click to add */}
       <div
-        onClick={onAreaClick}
+        onDoubleClick={onAreaClick}
         className="relative border-b border-dashed border-accent/20"
         style={{ minHeight: '1.6rem', cursor: 'crosshair' }}
-        title="Clique para adicionar cifra"
+        title="Duplo-clique para adicionar cifra"
       >
         {tokens.length === 0 && (
           <span className="chord-line text-accent/20 text-xs italic pointer-events-none select-none absolute top-0 left-0">
-            cifra...
+            duplo-clique para adicionar cifra...
           </span>
         )}
         {tokens.map(token => (
@@ -413,6 +413,38 @@ function BlockCard({
     onChange({ ...block, lines: block.lines.filter((_, i) => i !== idx) });
   }
 
+  // Split a single line into two at the cursor position (or midpoint if no cursor)
+  function splitLineAt(idx: number) {
+    const input = lyricsRefs.current.get(idx);
+    const line = block.lines[idx];
+    if (!line.lyrics.trim()) return;
+
+    const rawCursor = input?.selectionStart ?? null;
+    const mid = Math.ceil(line.lyrics.length / 2);
+    const cursor = (rawCursor !== null && rawCursor > 0 && rawCursor < line.lyrics.length)
+      ? rawCursor : mid;
+    if (cursor <= 0 || cursor >= line.lyrics.length) return;
+
+    const lyrics1 = line.lyrics.slice(0, cursor);
+    const afterSplit = line.lyrics.slice(cursor);
+    const lyrics2 = afterSplit.trimStart();
+    const splitCol = cursor + (afterSplit.length - lyrics2.length);
+
+    const tokens = parseChordsToTokens(line.chords);
+    const tokens1 = tokens.filter(t => t.pos < splitCol);
+    const tokens2 = tokens
+      .filter(t => t.pos >= splitCol)
+      .map(t => ({ ...t, id: `t${t.pos}`, pos: t.pos - splitCol }));
+
+    const newLines = [...block.lines];
+    newLines.splice(idx, 1,
+      { chords: tokensToString(tokens1), lyrics: lyrics1 },
+      { chords: tokensToString(tokens2), lyrics: lyrics2 }
+    );
+    onChange({ ...block, lines: newLines });
+    setPendingFocus(idx + 1);
+  }
+
   const blockStyle = blockTypeStyles[block.type] ?? 'block-verse';
 
   return (
@@ -477,7 +509,7 @@ function BlockCard({
       <div className="space-y-0">
         {block.lines.map((line, i) => (
           <div key={i}>
-            <div className="group/line relative pr-6">
+            <div className="group/line relative pr-12">
               {/* Inline chord editor — chips sit at exact positions above the lyric */}
               <InlineChordEditor
                 chords={line.chords}
@@ -492,14 +524,25 @@ function BlockCard({
                 placeholder="letra..."
                 className="lyric-line w-full bg-transparent border-0 border-b border-dashed border-border/30 focus:border-border/60 focus:outline-none placeholder:text-subtle placeholder:opacity-50 pb-0.5 mt-0.5"
               />
-              <button
-                onClick={() => deleteLine(i)}
-                disabled={block.lines.length <= 1}
-                className="absolute right-0 top-1 p-0.5 text-transparent group-hover/line:text-subtle/50 hover:!text-danger disabled:!opacity-0 transition-colors cursor-pointer"
-                title="Remover linha"
-              >
-                <Trash2 className="w-3 h-3" />
-              </button>
+              {/* Line actions — visible on hover */}
+              <div className="absolute right-0 top-1 flex items-center gap-0.5 opacity-0 group-hover/line:opacity-100 transition-opacity">
+                <button
+                  onClick={() => splitLineAt(i)}
+                  disabled={!line.lyrics.trim()}
+                  className="p-0.5 text-subtle hover:text-accent disabled:opacity-0 transition-colors cursor-pointer"
+                  title="Dividir linha aqui (coloque o cursor na letra antes)"
+                >
+                  <Scissors className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => deleteLine(i)}
+                  disabled={block.lines.length <= 1}
+                  className="p-0.5 text-subtle hover:text-danger disabled:opacity-0 transition-colors cursor-pointer"
+                  title="Remover linha"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
             </div>
 
             {/* Split button — appears on hover between lines */}
