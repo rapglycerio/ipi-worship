@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { mockSongs, liturgicalTagLabels, getDefaultVersion } from '@/data/mock-songs';
+import { useSongs } from '@/hooks/useData';
 import SongCard from '@/components/SongCard';
 import {
   Search,
@@ -9,10 +9,12 @@ import {
   ArrowLeft,
   TrendingUp,
   Clock,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function BuscaPage() {
+  const { songs, loading } = useSongs();
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -23,7 +25,7 @@ export default function BuscaPage() {
   const results = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
-    return mockSongs.filter((song) => {
+    return songs.filter((song) => {
       const titleMatch = song.title.toLowerCase().includes(q);
       const artistMatch = song.versions.some((v) =>
         v.artists.some((a) => a.toLowerCase().includes(q))
@@ -36,7 +38,7 @@ export default function BuscaPage() {
       const composerMatch = song.originalComposer?.toLowerCase().includes(q) || false;
       return titleMatch || artistMatch || lyricsMatch || composerMatch;
     });
-  }, [query]);
+  }, [query, songs]);
 
   const showSuggestions = !query.trim();
 
@@ -83,7 +85,7 @@ export default function BuscaPage() {
           </p>
         )}
 
-        {query.trim() && results.length === 0 && (
+        {query.trim() && results.length === 0 && !loading && (
           <div className="text-center py-12">
             <Search className="w-10 h-10 text-subtle mx-auto mb-3" />
             <p className="text-sm text-muted">Nenhum resultado encontrado.</p>
@@ -123,15 +125,27 @@ export default function BuscaPage() {
             <div className="mt-6">
               <div className="flex items-center gap-2 mb-3">
                 <Clock className="w-4 h-4 text-subtle" />
-                <span className="text-xs font-semibold text-foreground">Todo o Repertório</span>
+                <span className="text-xs font-semibold text-foreground">
+                  Todo o Repertório
+                  {!loading && (
+                    <span className="ml-1.5 text-subtle font-normal">({songs.length} músicas)</span>
+                  )}
+                </span>
               </div>
-              <div className="space-y-2">
-                {mockSongs.map((song, i) => (
-                  <div key={song.id} className="animate-fade-in" style={{ animationDelay: `${i * 80}ms` }}>
-                    <SongCard song={song} compact />
-                  </div>
-                ))}
-              </div>
+
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 text-accent animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {songs.map((song, i) => (
+                    <div key={song.id} className="animate-fade-in" style={{ animationDelay: `${Math.min(i * 20, 400)}ms` }}>
+                      <SongCard song={song} compact />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

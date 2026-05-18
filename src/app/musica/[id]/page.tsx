@@ -60,16 +60,14 @@ const SERVICE_TYPES = [
 ];
 
 // ── Auto-Scroller ─────────────────────────────────────────────
-
-const SPEEDS = [
-  { label: 'Lento',  px: 15 },  // px/sec
-  { label: 'Médio',  px: 35 },
-  { label: 'Rápido', px: 70 },
-];
+// 5 speed levels (px/sec): 8 · 18 · 32 · 52 · 80
+const SPEED_LEVELS = [8, 18, 32, 52, 80];
+const MIN_SPEED = 0;
+const MAX_SPEED = SPEED_LEVELS.length - 1;
 
 function AutoScroller() {
   const [playing, setPlaying] = useState(false);
-  const [speedIdx, setSpeedIdx] = useState(1);
+  const [speedIdx, setSpeedIdx] = useState(2); // default: middle
   const rafRef = useRef<number | null>(null);
   const lastRef = useRef<number>(0);
   const accRef = useRef<number>(0);
@@ -80,7 +78,7 @@ function AutoScroller() {
       rafRef.current = null;
       return;
     }
-    const pxPerSec = SPEEDS[speedIdx].px;
+    const pxPerSec = SPEED_LEVELS[speedIdx];
     lastRef.current = performance.now();
 
     function step(now: number) {
@@ -100,26 +98,54 @@ function AutoScroller() {
 
   return (
     <div
-      className="fixed right-3 z-30 no-print flex items-center gap-1 bg-card/90 backdrop-blur-sm border border-border rounded-full shadow-lg px-2 py-1.5"
+      className="fixed right-3 z-30 no-print flex items-center gap-1.5 bg-card/95 backdrop-blur-sm border border-border rounded-full shadow-lg px-2.5 py-1.5"
       style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}
     >
-      <Gauge className="w-3.5 h-3.5 text-subtle shrink-0" />
-      {SPEEDS.map((s, i) => (
-        <button
-          key={i}
-          onClick={() => setSpeedIdx(i)}
-          className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full transition-colors cursor-pointer
-            ${speedIdx === i ? 'bg-accent/20 text-accent' : 'text-subtle hover:text-foreground'}`}
-        >{s.label}</button>
-      ))}
+      {/* Play / Pause */}
       <button
         onClick={() => setPlaying(p => !p)}
-        className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors cursor-pointer ml-0.5
+        className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors cursor-pointer
           ${playing ? 'bg-accent text-white' : 'bg-elevated text-muted hover:bg-border'}`}
         aria-label={playing ? 'Pausar rolagem' : 'Rolar automaticamente'}
       >
         {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
       </button>
+
+      {/* Speed stepper */}
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => setSpeedIdx(i => Math.max(MIN_SPEED, i - 1))}
+          disabled={speedIdx === MIN_SPEED}
+          className="w-6 h-6 flex items-center justify-center rounded-full text-muted hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors text-sm font-bold"
+          aria-label="Diminuir velocidade"
+        >−</button>
+
+        <div className="flex items-center gap-0.5">
+          {SPEED_LEVELS.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setSpeedIdx(i)}
+              className={`rounded-full transition-all cursor-pointer ${
+                i === speedIdx
+                  ? 'w-2.5 h-2.5 bg-accent'
+                  : i < speedIdx
+                    ? 'w-1.5 h-1.5 bg-accent/40'
+                    : 'w-1.5 h-1.5 bg-border hover:bg-muted'
+              }`}
+              aria-label={`Velocidade ${i + 1}`}
+            />
+          ))}
+        </div>
+
+        <button
+          onClick={() => setSpeedIdx(i => Math.min(MAX_SPEED, i + 1))}
+          disabled={speedIdx === MAX_SPEED}
+          className="w-6 h-6 flex items-center justify-center rounded-full text-muted hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors text-sm font-bold"
+          aria-label="Aumentar velocidade"
+        >+</button>
+      </div>
+
+      <Gauge className="w-3 h-3 text-subtle shrink-0" />
     </div>
   );
 }
