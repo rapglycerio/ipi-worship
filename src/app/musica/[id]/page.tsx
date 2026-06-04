@@ -68,6 +68,17 @@ const MAX_SPEED = SPEED_LEVELS.length - 1;
 function AutoScroller() {
   const [playing, setPlaying] = useState(false);
   const [speedIdx, setSpeedIdx] = useState(2); // default: middle
+
+  useEffect(() => {
+    const saved = localStorage.getItem('autoScrollSpeedIdx');
+    if (saved !== null) {
+      setSpeedIdx(parseInt(saved, 10));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('autoScrollSpeedIdx', speedIdx.toString());
+  }, [speedIdx]);
   const rafRef = useRef<number | null>(null);
   const lastRef = useRef<number>(0);
   const accRef = useRef<number>(0);
