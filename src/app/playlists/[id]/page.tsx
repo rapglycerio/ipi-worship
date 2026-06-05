@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSongs, usePlaylists } from '@/hooks/useData';
 import SongCard from '@/components/SongCard';
 import { CalendarDays, Loader2, Share2, Settings2, GripVertical, Trash2, Save, X, Check } from 'lucide-react';
@@ -10,6 +10,7 @@ import { updatePlaylist, updateArrangementOrders, removeArrangementFromPlaylist 
 
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   KeyboardSensor,
   MouseSensor,
@@ -17,6 +18,7 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -86,6 +88,7 @@ export default function SinglePlaylistPage() {
   const [copied, setCopied] = useState(false);
   
   const [optimisticArrangements, setOptimisticArrangements] = useState<any[]>([]);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
   const playlistId = params.id as string;
   const playlist = playlists.find(p => p.id === playlistId);
@@ -111,7 +114,12 @@ export default function SinglePlaylistPage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
+  }, []);
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    setActiveDragId(null);
     const { active, over } = event;
     if (over && active.id !== over.id) {
       setOptimisticArrangements((items) => {
@@ -126,7 +134,7 @@ export default function SinglePlaylistPage() {
         return newArrangements;
       });
     }
-  };
+  }, [playlistId, refetch]);
 
   const handleSaveDetails = async () => {
     await updatePlaylist(playlistId, {
@@ -305,7 +313,7 @@ export default function SinglePlaylistPage() {
           {isEditing && <span className="text-accent normal-case font-normal text-xs">Arraste para reordenar</span>}
         </p>
         
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <SortableContext items={optimisticArrangements.map(a => a.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-3">
               {optimisticArrangements.map((arr, i) => (
@@ -325,6 +333,23 @@ export default function SinglePlaylistPage() {
               )}
             </div>
           </SortableContext>
+          <DragOverlay adjustScale={false}>
+            {activeDragId ? (() => {
+              const arr = optimisticArrangements.find(a => a.id === activeDragId);
+              const idx = optimisticArrangements.findIndex(a => a.id === activeDragId);
+              if (!arr) return null;
+              return (
+                <div className="flex items-stretch gap-2 opacity-95 shadow-xl rounded-xl">
+                  <div className="flex-shrink-0 flex items-center justify-center px-1 text-accent">
+                    <GripVertical className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <SongCard song={arr.song} index={idx} />
+                  </div>
+                </div>
+              );
+            })() : null}
+          </DragOverlay>
         </DndContext>
       </div>
     </div>

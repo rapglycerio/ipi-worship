@@ -34,7 +34,8 @@ export async function fetchAllSongs(): Promise<MasterSong[]> {
         chord_blocks(*)
       )
     `)
-    .order('title');
+    .order('title')
+    .range(0, 9999);
 
   if (error) {
     console.error('Error fetching songs:', error);
