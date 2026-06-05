@@ -138,12 +138,12 @@ export default function ChordBlockView({ block, viewMode, fontSize, transposeSem
               ) : (
                 <>
                   {viewMode === 'chords_and_lyrics' && line.chords.trim() && (
-                    <div className={`chord-line ${fontSizeMap[fontSize]}`}>
+                    <div className={`chord-line ${fontSizeMap[fontSize]}`} style={{ letterSpacing: 'normal', fontWeight: '500' }}>
                       {transposeLine(line.chords, transposeSemitones)}
                     </div>
                   )}
                   {line.lyrics.trim() && (
-                    <div className={`lyric-line ${fontSizeMap[fontSize]}`}>
+                    <div className={`lyric-line ${fontSizeMap[fontSize]}`} style={{ letterSpacing: 'normal', fontWeight: '500' }}>
                       {line.lyrics}
                     </div>
                   )}
