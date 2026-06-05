@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { usePlaylists, useSongs } from '@/hooks/useData';
 import {
   DndContext,
@@ -71,8 +72,9 @@ export default function PlaylistsPage() {
   const isAdmin = (session?.user as any)?.isAdmin === true;
   const isLoggedIn = !!session?.user;
 
+  const router = useRouter();
+
   const [tab, setTab] = useState<Tab>('upcoming');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [saving, setSaving] = useState(false);
@@ -103,7 +105,6 @@ export default function PlaylistsPage() {
 
   const visiblePlaylists = tab === 'upcoming' ? upcomingPlaylists : pastPlaylists;
 
-  const selectedPlaylist = selectedId ? playlists.find((p) => p.id === selectedId) : null;
 
   const openCreate = () => {
     setEditingPlaylist(null);
@@ -139,21 +140,6 @@ export default function PlaylistsPage() {
     }
   };
 
-  if (selectedPlaylist) {
-    return (
-      <PlaylistDetail
-        key={selectedPlaylist.id}
-        playlist={selectedPlaylist}
-        songs={songs}
-        onBack={() => setSelectedId(null)}
-        onEditPlaylist={(pl) => {
-          setEditingPlaylist(pl);
-          setModalOpen(true);
-        }}
-        onRefetch={refetch}
-      />
-    );
-  }
 
   return (
     <div className="min-h-screen">
@@ -337,7 +323,7 @@ export default function PlaylistsPage() {
             return (
               <div
                 key={pl.id}
-                onClick={() => setSelectedId(pl.id)}
+                onClick={() => router.push(`/playlists/${pl.id}`)}
                 className="bg-card border border-border rounded-xl p-4 hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5 transition-all duration-200 cursor-pointer group animate-slide-up"
               >
                 <div className="flex items-start justify-between">
