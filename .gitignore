@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# cifra migration artifacts (generated from the PPTX deck — not source)
+/scripts/_slides/
+/scripts/_parsed.json
+/scripts/_backup_chord_blocks.json
