@@ -18,6 +18,22 @@ import type {
   StageDirectionItem,
 } from '@/types';
 
+/** POST JSON to a server route that authorizes the action; returns its `ok`. */
+async function postOk(url: string, body: unknown): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return false;
+    const json = await res.json().catch(() => ({ ok: false }));
+    return json?.ok === true;
+  } catch {
+    return false;
+  }
+}
+
 // === SONGS ===
 
 export async function fetchAllSongs(): Promise<MasterSong[]> {
@@ -66,6 +82,12 @@ export async function fetchSongById(id: string): Promise<MasterSong | null> {
 }
 
 export async function searchSongs(query: string): Promise<MasterSong[]> {
+  // PostgREST's `.or()` uses commas/parens as syntax and `%`/`_` as LIKE
+  // wildcards. Strip those so a search like "graça, paz (2x)" can't break the
+  // filter or inject wildcards.
+  const safe = query.replace(/[,()%_*\\"]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!safe) return [];
+
   const { data, error } = await supabase
     .from('master_songs')
     .select(`
@@ -78,7 +100,7 @@ export async function searchSongs(query: string): Promise<MasterSong[]> {
         chord_blocks(*)
       )
     `)
-    .or(`title.ilike.%${query}%,searchable_lyrics.ilike.%${query}%`)
+    .or(`title.ilike.%${safe}%,searchable_lyrics.ilike.%${safe}%`)
     .order('title');
 
   if (error) return [];
@@ -243,12 +265,9 @@ export async function updatePlaylist(
 }
 
 export async function deletePlaylist(id: string): Promise<boolean> {
-  const { error } = await supabase.from('playlists').delete().eq('id', id);
-  if (error) {
-    console.error('Error deleting playlist:', error);
-    return false;
-  }
-  return true;
+  // Routed through a server endpoint that verifies the session — anon clients
+  // can no longer delete playlists directly (RLS denies it).
+  return postOk('/api/playlists/delete', { id });
 }
 
 export async function addSongToPlaylist(data: {
@@ -302,12 +321,8 @@ export async function updateArrangementOrders(
 // === SONG CRUD ===
 
 export async function deleteSong(id: string): Promise<boolean> {
-  const { error } = await supabase.from('master_songs').delete().eq('id', id);
-  if (error) {
-    console.error('Error deleting song:', error);
-    return false;
-  }
-  return true;
+  // Admin-only, enforced server-side (RLS denies anon DELETE on master_songs).
+  return postOk('/api/admin/delete-song', { id });
 }
 
 export async function updateSongMetadata(
@@ -491,40 +506,13 @@ export async function fetchAllUsers(): Promise<AppUserRecord[]> {
 }
 
 export async function setUserAdmin(userId: string, admin: boolean): Promise<boolean> {
-  const { error } = await supabase
-    .from('app_users')
-    .update({ role: admin ? 'admin' : 'member' })
-    .eq('id', userId);
-  if (error) { console.error('Error updating user role:', error); return false; }
-  return true;
+  // Admin-only, enforced server-side (RLS denies anon writes to app_users, so
+  // nobody can self-promote by calling Supabase directly).
+  return postOk('/api/admin/set-role', { userId, admin });
 }
 
-// === AUTH HELPERS ===
-
-export async function getUserRole(email: string): Promise<string | null> {
-  const { data, error } = await supabase
-    .from('app_users')
-    .select('role')
-    .eq('email', email)
-    .single();
-  if (error || !data) return null;
-  return data.role;
-}
-
-export async function upsertAppUser(user: {
-  email: string;
-  displayName: string;
-  photoUrl?: string;
-}): Promise<void> {
-  await supabase.from('app_users').upsert(
-    {
-      email: user.email,
-      display_name: user.displayName,
-      photo_url: user.photoUrl ?? null,
-    },
-    { onConflict: 'email' }
-  );
-}
+// NOTE: getUserRole / upsertAppUser moved to src/lib/data-admin.ts — they run
+// server-side with the service_role key (app_users is read-only for anon).
 
 // === MAPPERS ===
 

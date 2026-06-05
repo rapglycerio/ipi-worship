@@ -36,6 +36,16 @@ export const BLOCK_TYPE_OPTIONS: { value: BlockType; label: string }[] = [
   { value: 'tag',        label: 'Tag' },
 ];
 
+/** The canonical display name for a block type (e.g. 'chorus' → 'Refrão'). */
+function labelForType(type: BlockType): string {
+  return BLOCK_TYPE_OPTIONS.find((o) => o.value === type)?.label ?? 'Bloco';
+}
+
+/** True when the block's label was personalized (differs from its type's name). */
+function hasCustomLabel(block: ChordBlock): boolean {
+  return block.label.trim().toLowerCase() !== labelForType(block.type).toLowerCase();
+}
+
 const DIRECTION_OPTIONS: { value: StageDirection; label: string; icon: typeof Mic }[] = [
   { value: 'crescendo',        label: 'Crescendo',         icon: ArrowUp },
   { value: 'decrescendo',      label: 'Decrescendo',       icon: ArrowDown },
@@ -389,7 +399,20 @@ function BlockCard({
   onChange, onDelete, onDuplicate, onMoveUp, onMoveDown, onSplitAt,
 }: BlockCardProps) {
   const [pendingFocus, setPendingFocus] = useState<number | null>(null);
+  const [customMode, setCustomMode] = useState(() => hasCustomLabel(block));
   const lyricsRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+
+  // Picking a type from the unified dropdown: a preset sets both the type and
+  // its canonical name; "Personalizar…" keeps the type but frees the label.
+  function handleTypeSelect(value: string) {
+    if (value === '__custom__') {
+      setCustomMode(true);
+      return;
+    }
+    setCustomMode(false);
+    const type = value as BlockType;
+    onChange({ ...block, type, label: labelForType(type) });
+  }
 
   useEffect(() => {
     if (pendingFocus === null) return;
@@ -452,23 +475,30 @@ function BlockCard({
       {/* ── Header ── */}
       <div className="flex items-start justify-between mb-2 gap-2">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
-          <input
-            value={block.label}
-            onChange={(e) => onChange({ ...block, label: e.target.value })}
-            className="text-[11px] font-bold uppercase tracking-wider text-accent bg-transparent border-0 focus:outline-none p-0 min-w-[2ch]"
-            style={{ width: `${Math.max(block.label.length, 3) + 1}ch` }}
-            title="Editar rótulo"
-          />
+          {/* Unified type + name control: pick a type (sets the name), or
+              choose "Personalizar…" to type a free label. */}
           <select
-            value={block.type}
-            onChange={(e) => onChange({ ...block, type: e.target.value as BlockType })}
-            className="text-[10px] text-subtle bg-transparent border-0 focus:outline-none cursor-pointer p-0"
-            title="Tipo de bloco"
+            value={customMode ? '__custom__' : block.type}
+            onChange={(e) => handleTypeSelect(e.target.value)}
+            className="text-[11px] font-bold uppercase tracking-wider text-accent bg-transparent border-0 focus:outline-none cursor-pointer p-0"
+            title="Tipo do bloco"
           >
             {BLOCK_TYPE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
+            <option value="__custom__">Personalizar…</option>
           </select>
+          {customMode && (
+            <input
+              autoFocus
+              value={block.label}
+              onChange={(e) => onChange({ ...block, label: e.target.value })}
+              placeholder="Nome do bloco"
+              className="text-[11px] font-bold uppercase tracking-wider text-accent bg-accent/10 border border-accent/30 rounded px-1.5 py-0.5 focus:outline-none focus:border-accent/60 min-w-[6ch]"
+              style={{ width: `${Math.max(block.label.length, 6) + 1}ch` }}
+              title="Nome personalizado do bloco"
+            />
+          )}
           <span className="inline-flex items-center gap-0.5 bg-accent/10 rounded-full px-1.5 py-0.5">
             <Repeat className="w-3 h-3 text-accent" />
             <button

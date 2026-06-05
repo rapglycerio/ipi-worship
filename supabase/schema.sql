@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS master_songs (
   nature            TEXT        NOT NULL DEFAULT 'louvor'
                                 CHECK (nature IN ('louvor', 'hino')),
   searchable_lyrics TEXT,
+  is_adjusted       BOOLEAN     NOT NULL DEFAULT false,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -102,7 +103,18 @@ CREATE TABLE IF NOT EXISTS app_users (
   photo_url    TEXT,
   role         TEXT        NOT NULL DEFAULT 'visitor'
                            CHECK (role IN ('visitor','member','admin')),
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_seen    TIMESTAMPTZ
+);
+
+-- Sugestões de músicas para a próxima playlist (feitas por membros logados)
+CREATE TABLE IF NOT EXISTS song_suggestions (
+  id                UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  master_song_id    UUID        NOT NULL REFERENCES master_songs(id) ON DELETE CASCADE,
+  suggested_by_email TEXT       NOT NULL,
+  suggested_by_name TEXT        NOT NULL,
+  message           TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- -------------------------------------------------------------
