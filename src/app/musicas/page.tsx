@@ -39,14 +39,13 @@ export default function MusicasPage() {
       // Text search (title, artists, lyrics)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const titleMatch = song.title.toLowerCase().includes(q);
+        const titleMatch = song.title?.toLowerCase().includes(q) || false;
         const artistMatch = song.versions.some((v) =>
-          v.artists.some((a) => a.toLowerCase().includes(q))
+          v.artists?.some((a) => a?.toLowerCase().includes(q))
         );
-        // Search within lyrics
         const lyricsMatch = song.versions.some((v) =>
-          v.blocks.some((b) =>
-            b.lines.some((l) => l.lyrics.toLowerCase().includes(q))
+          v.blocks?.some((b) =>
+            b.lines?.some((l) => l.lyrics?.toLowerCase().includes(q))
           )
         );
         if (!titleMatch && !artistMatch && !lyricsMatch) return false;

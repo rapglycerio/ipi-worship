@@ -46,16 +46,16 @@ export function useSongs() {
       return results.length > 0 ? results : songs.filter((s) => {
         const q = query.toLowerCase();
         return (
-          s.title.toLowerCase().includes(q) ||
-          s.versions.some((v) => v.artists.some((a) => a.toLowerCase().includes(q)))
+          s.title?.toLowerCase().includes(q) ||
+          s.versions?.some((v) => v.artists?.some((a) => a?.toLowerCase().includes(q))) || false
         );
       });
     } catch {
       // Local filter fallback
       const q = query.toLowerCase();
       return songs.filter((s) =>
-        s.title.toLowerCase().includes(q) ||
-        s.versions.some((v) => v.artists.some((a) => a.toLowerCase().includes(q)))
+        s.title?.toLowerCase().includes(q) ||
+        s.versions?.some((v) => v.artists?.some((a) => a?.toLowerCase().includes(q))) || false
       );
     }
   }, [songs]);
