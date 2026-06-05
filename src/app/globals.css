@@ -172,8 +172,8 @@ body {
 }
 
 .lyric-line {
-  font-family: var(--font-sans);
-  font-weight: 400;
+  font-family: var(--font-mono);
+  font-weight: 500;
   color: var(--foreground);
   white-space: pre-wrap;
   line-height: 1.8;
