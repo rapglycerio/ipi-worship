@@ -6,7 +6,7 @@ import SongCard from '@/components/SongCard';
 import { CalendarDays, Loader2, Share2, Settings2, GripVertical, Trash2, Save, X, Check } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { updatePlaylist, updateArrangementOrders, removeArrangementFromPlaylist, updateArrangementKey } from '@/lib/data';
+import { updatePlaylist, updateArrangementOrders, removeArrangementFromPlaylist } from '@/lib/data';
 
 import {
   DndContext,
@@ -29,12 +29,6 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-// Common keys offered as the "service key" (tom do culto) for a song.
-const KEY_OPTIONS = [
-  'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
-  'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm',
-];
-
 function SortableSongCard({
   id,
   song,
@@ -42,8 +36,6 @@ function SortableSongCard({
   isEditing,
   onRemove,
   playlistId,
-  transposedKey,
-  onSetKey,
 }: {
   id: string;
   song: any;
@@ -51,8 +43,6 @@ function SortableSongCard({
   isEditing: boolean;
   onRemove: (id: string) => void;
   playlistId: string;
-  transposedKey?: string;
-  onSetKey: (id: string, key: string | null) => void;
 }) {
   const {
     attributes,
@@ -82,32 +72,16 @@ function SortableSongCard({
         </div>
       )}
       <div className={`flex-1 min-w-0 ${isEditing ? 'pointer-events-none opacity-90' : ''}`}>
-        <SongCard song={song} index={index} playlistId={playlistId} overrideKey={transposedKey} />
+        <SongCard song={song} index={index} playlistId={playlistId} />
       </div>
       {isEditing && (
-        <>
-          {/* Service-key picker */}
-          <div className="flex-shrink-0 flex items-center">
-            <select
-              value={transposedKey ?? ''}
-              onChange={(e) => onSetKey(id, e.target.value || null)}
-              title="Tom para este culto"
-              className="h-full bg-background border border-border rounded-xl px-2 text-xs font-mono text-foreground focus:outline-none focus:border-accent cursor-pointer"
-            >
-              <option value="">Tom orig.</option>
-              {KEY_OPTIONS.map((k) => (
-                <option key={k} value={k}>{k}</option>
-              ))}
-            </select>
-          </div>
-          <button
-            onClick={() => onRemove(id)}
-            className="flex-shrink-0 px-3 flex items-center justify-center text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
-            title="Remover da playlist"
-          >
-            <Trash2 className="w-5 h-5" />
-          </button>
-        </>
+        <button
+          onClick={() => onRemove(id)}
+          className="flex-shrink-0 px-3 flex items-center justify-center text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
+          title="Remover da playlist"
+        >
+          <Trash2 className="w-5 h-5" />
+        </button>
       )}
     </div>
   );
@@ -194,13 +168,6 @@ export default function SinglePlaylistPage() {
     }
   };
 
-  const handleSetKey = async (arrId: string, key: string | null) => {
-    setOptimisticArrangements(prev =>
-      prev.map(a => (a.id === arrId ? { ...a, transposedKey: key ?? undefined } : a))
-    );
-    await updateArrangementKey(arrId, key);
-    refetch();
-  };
 
   if (loading) {
     return (
@@ -375,8 +342,6 @@ export default function SinglePlaylistPage() {
                   isEditing={isEditing}
                   onRemove={handleRemoveArrangement}
                   playlistId={playlistId}
-                  transposedKey={arr.transposedKey}
-                  onSetKey={handleSetKey}
                 />
               ))}
               {optimisticArrangements.length === 0 && (
