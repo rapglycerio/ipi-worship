@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSongs, usePlaylists } from '@/hooks/useData';
 import SongCard from '@/components/SongCard';
+import { getDefaultVersion } from '@/data/mock-songs';
 import { CalendarDays, Loader2, Share2, Settings2, GripVertical, Trash2, Save, X, Check } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -60,29 +61,44 @@ function SortableSongCard({
     position: 'relative' as const,
   };
 
-  return (
-    <div ref={setNodeRef} style={style} className={`flex items-stretch gap-2 ${isDragging ? 'opacity-80' : ''}`}>
-      {isEditing && (
+  // Edit mode: a compact, high-contrast row focused on reordering/removing —
+  // the song name stays clearly readable even on a narrow phone screen.
+  if (isEditing) {
+    const artists = getDefaultVersion(song)?.artists.join(', ') ?? '';
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`flex items-center gap-2 bg-card border border-border rounded-xl p-2.5 ${isDragging ? 'opacity-80 shadow-lg' : ''}`}
+      >
         <div
-          className="flex-shrink-0 flex items-center justify-center px-1 cursor-grab active:cursor-grabbing text-muted hover:text-foreground touch-none"
+          className="flex-shrink-0 flex items-center justify-center cursor-grab active:cursor-grabbing text-muted hover:text-foreground touch-none p-1"
           {...attributes}
           {...listeners}
         >
-          <GripVertical className="w-6 h-6" />
+          <GripVertical className="w-5 h-5" />
         </div>
-      )}
-      <div className={`flex-1 min-w-0 ${isEditing ? 'pointer-events-none opacity-90' : ''}`}>
-        <SongCard song={song} index={index} playlistId={playlistId} />
-      </div>
-      {isEditing && (
+        <span className="flex-shrink-0 w-6 text-center text-xs font-bold text-subtle">{index + 1}</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground truncate">{song.title}</p>
+          {artists && <p className="text-[11px] text-muted truncate">{artists}</p>}
+        </div>
         <button
           onClick={() => onRemove(id)}
-          className="flex-shrink-0 px-3 flex items-center justify-center text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
+          className="flex-shrink-0 w-9 h-9 flex items-center justify-center text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
           title="Remover da playlist"
+          aria-label="Remover da playlist"
         >
           <Trash2 className="w-5 h-5" />
         </button>
-      )}
+      </div>
+    );
+  }
+
+  // View mode: the full, clickable song card.
+  return (
+    <div ref={setNodeRef} style={style} className={isDragging ? 'opacity-80' : ''}>
+      <SongCard song={song} index={index} playlistId={playlistId} />
     </div>
   );
 }
@@ -356,13 +372,16 @@ export default function SinglePlaylistPage() {
               const arr = optimisticArrangements.find(a => a.id === activeDragId);
               const idx = optimisticArrangements.findIndex(a => a.id === activeDragId);
               if (!arr) return null;
+              const artists = getDefaultVersion(arr.song)?.artists.join(', ') ?? '';
               return (
-                <div className="flex items-stretch gap-2 opacity-95 shadow-xl rounded-xl">
-                  <div className="flex-shrink-0 flex items-center justify-center px-1 text-accent">
-                    <GripVertical className="w-6 h-6" />
+                <div className="flex items-center gap-2 bg-card border border-accent/40 rounded-xl p-2.5 opacity-95 shadow-xl">
+                  <div className="flex-shrink-0 flex items-center justify-center text-accent p-1">
+                    <GripVertical className="w-5 h-5" />
                   </div>
+                  <span className="flex-shrink-0 w-6 text-center text-xs font-bold text-subtle">{idx + 1}</span>
                   <div className="flex-1 min-w-0">
-                    <SongCard song={arr.song} index={idx} />
+                    <p className="text-sm font-semibold text-foreground truncate">{arr.song.title}</p>
+                    {artists && <p className="text-[11px] text-muted truncate">{artists}</p>}
                   </div>
                 </div>
               );
