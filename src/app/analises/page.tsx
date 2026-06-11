@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { mockSongs, liturgicalTagLabels } from '@/data/mock-songs';
+import { useSongs } from '@/hooks/useData';
+import { liturgicalTagLabels } from '@/data/mock-songs';
 import type { ApprovalStatus, MasterSong } from '@/types';
 import Link from 'next/link';
 import {
@@ -13,10 +14,8 @@ import {
   BookOpen,
   ChevronDown,
   ChevronUp,
-  Music2,
-  Users,
+  Loader2,
   Tag,
-  ExternalLink,
 } from 'lucide-react';
 
 const statusConfig: Record<ApprovalStatus, { icon: typeof ShieldCheck; color: string; bg: string; border: string; label: string }> = {
@@ -26,19 +25,31 @@ const statusConfig: Record<ApprovalStatus, { icon: typeof ShieldCheck; color: st
 };
 
 export default function AnalisesPage() {
+  const { songs, loading } = useSongs();
   const [filterStatus, setFilterStatus] = useState<ApprovalStatus | 'all'>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const filteredSongs = mockSongs.filter((s) => {
+  // A song with no analysis row counts as "pending" (needs review).
+  const statusOf = (s: MasterSong): ApprovalStatus => s.analysis?.status ?? 'pending';
+
+  const filteredSongs = songs.filter((s) => {
     if (filterStatus === 'all') return true;
-    return s.analysis?.status === filterStatus;
+    return statusOf(s) === filterStatus;
   });
 
   const counts = {
-    approved: mockSongs.filter((s) => s.analysis?.status === 'approved').length,
-    pending: mockSongs.filter((s) => s.analysis?.status === 'pending').length,
-    rejected: mockSongs.filter((s) => s.analysis?.status === 'rejected').length,
+    approved: songs.filter((s) => statusOf(s) === 'approved').length,
+    pending: songs.filter((s) => statusOf(s) === 'pending').length,
+    rejected: songs.filter((s) => statusOf(s) === 'rejected').length,
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-accent animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">

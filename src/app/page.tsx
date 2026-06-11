@@ -123,8 +123,11 @@ function PlaylistSection({
   animOffset: number;
 }) {
   const playlistSongs = playlist.arrangements
-    .map((arr) => songs.find((s) => s.id === arr.masterSongId)!)
-    .filter(Boolean);
+    .map((arr) => {
+      const song = songs.find((s) => s.id === arr.masterSongId);
+      return song ? { song, arr } : null;
+    })
+    .filter(Boolean) as { song: NonNullable<ReturnType<typeof useSongs>['songs'][number]>; arr: typeof playlist.arrangements[number] }[];
 
   return (
     <div>
@@ -161,9 +164,9 @@ function PlaylistSection({
         </div>
       ) : (
         <div className="space-y-2">
-          {playlistSongs.map((song, i) => (
-            <div key={song.id} className="animate-slide-up" style={{ animationDelay: `${(animOffset + i) * 60}ms` }}>
-              <SongCard song={song} index={i} />
+          {playlistSongs.map(({ song, arr }, i) => (
+            <div key={arr.id} className="animate-slide-up" style={{ animationDelay: `${(animOffset + i) * 60}ms` }}>
+              <SongCard song={song} index={i} playlistId={playlist.id} overrideKey={arr.transposedKey} />
             </div>
           ))}
         </div>

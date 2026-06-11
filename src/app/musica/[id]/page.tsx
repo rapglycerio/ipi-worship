@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 import { liturgicalTagLabels } from '@/data/mock-songs';
 import ChordBlockView, { ChordToolbar } from '@/components/ChordBlockView';
 import BlockEditor from '@/components/BlockEditor';
@@ -17,6 +18,8 @@ import {
   ShieldQuestion,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   BookOpen,
   PlayCircle,
   Music2,
@@ -563,11 +566,176 @@ function EditSongModal({ song, onClose, onSaved }: EditSongModalProps) {
   );
 }
 
+// ── Analysis Editor Modal ─────────────────────────────────────
+
+interface AnalysisEditorModalProps {
+  song: MasterSong;
+  analyzedByDefault: string;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function AnalysisEditorModal({ song, analyzedByDefault, onClose, onSaved }: AnalysisEditorModalProps) {
+  const existing = song.analysis;
+  const [status, setStatus] = useState<'approved' | 'rejected' | 'pending'>(existing?.status ?? 'pending');
+  const [justification, setJustification] = useState(existing?.justification ?? '');
+  const [refs, setRefs] = useState((existing?.scriptureReferences ?? []).join(', '));
+  const [analyzedBy, setAnalyzedBy] = useState(existing?.analyzedBy || analyzedByDefault);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const { upsertSongAnalysis } = await import('@/lib/data');
+      const ok = await upsertSongAnalysis(song.id, {
+        status,
+        justification: justification.trim(),
+        analyzedBy: analyzedBy.trim(),
+        scriptureReferences: refs
+          .split(',')
+          .map((r) => r.trim())
+          .filter(Boolean),
+      });
+      if (ok) onSaved();
+      else alert('Erro ao salvar análise. Tente novamente.');
+    } catch {
+      alert('Erro ao salvar análise. Verifique a conexão.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const STATUS_OPTIONS: { value: 'approved' | 'pending' | 'rejected'; label: string }[] = [
+    { value: 'approved', label: 'Aprovado' },
+    { value: 'pending', label: 'Pendente' },
+    { value: 'rejected', label: 'Rejeitado' },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-accent" />
+            <span className="text-sm font-bold text-foreground">Parecer Teológico</span>
+          </div>
+          <button onClick={onClose} className="p-1 text-subtle hover:text-foreground cursor-pointer transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto max-h-[70vh] px-4 py-4 space-y-3">
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">Situação</label>
+            <div className="grid grid-cols-3 gap-2">
+              {STATUS_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setStatus(opt.value)}
+                  className={`py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                    status === opt.value
+                      ? opt.value === 'approved'
+                        ? 'bg-success text-white'
+                        : opt.value === 'rejected'
+                          ? 'bg-danger text-white'
+                          : 'bg-warning text-white'
+                      : 'bg-elevated text-muted hover:bg-border'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">Parecer pastoral</label>
+            <textarea
+              value={justification}
+              onChange={(e) => setJustification(e.target.value)}
+              rows={5}
+              placeholder="Justificativa teológica da avaliação…"
+              className="w-full px-3 py-2.5 bg-elevated border border-border rounded-lg text-sm text-foreground placeholder:text-subtle focus:outline-none focus:border-accent/50 resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">
+              Referências bíblicas (separadas por vírgula)
+            </label>
+            <input
+              type="text"
+              value={refs}
+              onChange={(e) => setRefs(e.target.value)}
+              placeholder="Salmos 100, João 4:24"
+              className="w-full px-3 py-2.5 bg-elevated border border-border rounded-lg text-sm text-foreground placeholder:text-subtle focus:outline-none focus:border-accent/50"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">Avaliado por</label>
+            <input
+              type="text"
+              value={analyzedBy}
+              onChange={(e) => setAnalyzedBy(e.target.value)}
+              className="w-full px-3 py-2.5 bg-elevated border border-border rounded-lg text-sm text-foreground placeholder:text-subtle focus:outline-none focus:border-accent/50"
+            />
+          </div>
+        </div>
+
+        <div className="px-4 py-3 border-t border-border flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl bg-elevated text-foreground font-semibold text-sm hover:bg-border transition-all cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 py-2.5 rounded-xl bg-accent text-white font-semibold text-sm hover:bg-accent/90 disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-2"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvar Parecer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Key distance helper ───────────────────────────────────────
+// Smallest semitone shift (−6..+6) from one key to another, so applying a
+// playlist's service key transposes the chart by the minimal amount.
+const KEY_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const KEY_FLAT_TO_SHARP: Record<string, string> = {
+  Db: 'C#', Eb: 'D#', Gb: 'F#', Ab: 'G#', Bb: 'A#', Cb: 'B', Fb: 'E',
+};
+function keyRootIndex(key: string): number | null {
+  const m = key.match(/^([A-G])(#|b)?/);
+  if (!m) return null;
+  const root = KEY_FLAT_TO_SHARP[m[1] + (m[2] || '')] ?? m[1] + (m[2] || '');
+  const idx = KEY_NOTES.indexOf(root);
+  return idx === -1 ? null : idx;
+}
+function semitonesBetween(from: string, to: string): number {
+  const a = keyRootIndex(from);
+  const b = keyRootIndex(to);
+  if (a === null || b === null) return 0;
+  let d = ((b - a) % 12 + 12) % 12;
+  if (d > 6) d -= 12;
+  return d;
+}
+
 // ── Main page ─────────────────────────────────────────────────
 
 export default function SongPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
+  const playlistId = searchParams.get('pl');
+  const [playlist, setPlaylist] = useState<Playlist | null>(null);
+  const plKeyApplied = useRef(false);
 
 
   const [song, setSong] = useState<MasterSong | null | undefined>(undefined);
@@ -582,6 +750,7 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
   const [suggesting, setSuggesting] = useState(false);
   const [suggested, setSuggested] = useState(false);
   const [showEditSong, setShowEditSong] = useState(false);
+  const [showAnalysisEditor, setShowAnalysisEditor] = useState(false);
   const [showEditBlocks, setShowEditBlocks] = useState(false);
   const [editBlocks, setEditBlocks] = useState<ChordBlock[]>([]);
   const [markAsAdjusted, setMarkAsAdjusted] = useState(false);
@@ -639,6 +808,36 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
     loadSong();
   }, [loadSong]);
 
+  // Load the playlist context when opened from a playlist (?pl=<id>),
+  // enabling per-song service key and prev/next navigation.
+  useEffect(() => {
+    plKeyApplied.current = false;
+    if (!playlistId) {
+      setPlaylist(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { fetchPlaylistById } = await import('@/lib/data');
+      const pl = await fetchPlaylistById(playlistId);
+      if (!cancelled) setPlaylist(pl);
+    })();
+    return () => { cancelled = true; };
+  }, [playlistId, id]);
+
+  // Apply the playlist's service key for this song once, as the initial transpose.
+  useEffect(() => {
+    if (plKeyApplied.current) return;
+    if (!playlist || !song) return;
+    const arr = playlist.arrangements.find((a) => a.masterSongId === id);
+    plKeyApplied.current = true;
+    if (!arr?.transposedKey) return;
+    const dv = song.versions.find((v) => v.isDefault) || song.versions[0];
+    if (!dv) return;
+    const semis = semitonesBetween(dv.key, arr.transposedKey);
+    if (semis !== 0) setTransposeSemitones(semis);
+  }, [playlist, song, id]);
+
   if (song === undefined) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -672,6 +871,14 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
   const approvalStatus = analysis?.status || 'pending';
   const isAdmin = (session?.user as any)?.isAdmin === true;
   const isLoggedIn = !!session?.user;
+
+  // Playlist navigation context (prev/next in the service order)
+  const plArrangements = playlist?.arrangements ?? [];
+  const plIndex = playlistId ? plArrangements.findIndex((a) => a.masterSongId === id) : -1;
+  const inPlaylist = plIndex >= 0;
+  const prevArr = plIndex > 0 ? plArrangements[plIndex - 1] : null;
+  const nextArr = inPlaylist && plIndex < plArrangements.length - 1 ? plArrangements[plIndex + 1] : null;
+  const plHref = (songId: string) => `/musica/${songId}?pl=${playlistId}`;
 
   const handleFontSizeChange = (size: FontSizePreset) => {
     setFontSize(size);
@@ -769,6 +976,17 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
           onClose={() => setShowEditSong(false)}
           onSaved={() => {
             setShowEditSong(false);
+            loadSong();
+          }}
+        />
+      )}
+      {showAnalysisEditor && (
+        <AnalysisEditorModal
+          song={song}
+          analyzedByDefault={session?.user?.name || ''}
+          onClose={() => setShowAnalysisEditor(false)}
+          onSaved={() => {
+            setShowAnalysisEditor(false);
             loadSong();
           }}
         />
@@ -885,14 +1103,20 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
       )}
 
       {/* Back Nav */}
-      <div className="px-4 py-3 no-print">
+      <div className="px-4 py-3 no-print flex items-center justify-between gap-2">
         <Link
-          href="/"
+          href={inPlaylist ? `/playlists/${playlistId}` : '/'}
           className="inline-flex items-center gap-2 text-sm text-muted hover:text-accent transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
-          Voltar
+          {inPlaylist ? 'Voltar à playlist' : 'Voltar'}
         </Link>
+        {inPlaylist && (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-subtle bg-elevated px-2.5 py-1 rounded-md">
+            <ListMusic className="w-3 h-3" />
+            {plIndex + 1} de {plArrangements.length}
+          </span>
+        )}
       </div>
 
       {/* Song Meta Header */}
@@ -988,6 +1212,14 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
                 >
                   <Pencil className="w-3.5 h-3.5" />
                   Metadados
+                </button>
+                <button
+                  onClick={() => setShowAnalysisEditor(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-elevated text-muted text-xs font-semibold hover:bg-border transition-all cursor-pointer"
+                  title="Avaliar parecer teológico"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Avaliar
                 </button>
                 <button
                   onClick={handleOpenEditBlocks}
@@ -1197,6 +1429,34 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
           />
         ))}
       </div>
+
+      {/* Playlist prev/next navigation */}
+      {inPlaylist && (
+        <div className="px-5 md:px-8 pb-8 no-print flex items-center gap-3">
+          {prevArr ? (
+            <Link
+              href={plHref(prevArr.masterSongId)}
+              className="flex-1 flex items-center gap-2 px-4 py-3 rounded-xl bg-elevated hover:bg-border text-foreground transition-colors cursor-pointer"
+            >
+              <ChevronLeft className="w-5 h-5 text-accent shrink-0" />
+              <span className="text-xs font-semibold">Anterior</span>
+            </Link>
+          ) : (
+            <div className="flex-1" />
+          )}
+          {nextArr ? (
+            <Link
+              href={plHref(nextArr.masterSongId)}
+              className="flex-1 flex items-center justify-end gap-2 px-4 py-3 rounded-xl bg-accent text-white hover:bg-accent/90 transition-colors cursor-pointer"
+            >
+              <span className="text-xs font-semibold">Próxima</span>
+              <ChevronRight className="w-5 h-5 shrink-0" />
+            </Link>
+          ) : (
+            <div className="flex-1" />
+          )}
+        </div>
+      )}
     </div>
   );
 }

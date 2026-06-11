@@ -307,6 +307,21 @@ export async function removeArrangementFromPlaylist(arrangementId: string): Prom
   return true;
 }
 
+export async function updateArrangementKey(
+  arrangementId: string,
+  key: string | null
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('worship_arrangements')
+    .update({ transposed_key: key })
+    .eq('id', arrangementId);
+  if (error) {
+    console.error('Error updating arrangement key:', error);
+    return false;
+  }
+  return true;
+}
+
 export async function updateArrangementOrders(
   updates: { id: string; sortOrder: number }[]
 ): Promise<boolean> {
@@ -471,6 +486,35 @@ export async function addSuggestion(data: {
 export async function removeSuggestion(id: string): Promise<boolean> {
   const { error } = await supabase.from('song_suggestions').delete().eq('id', id);
   if (error) { console.error('Error removing suggestion:', error); return false; }
+  return true;
+}
+
+// === THEOLOGICAL ANALYSIS ===
+
+/**
+ * Create or replace the theological analysis (parecer pastoral) for a song.
+ * There's no unique constraint on song_id, and the reader takes the first row,
+ * so we delete any existing rows and insert a fresh one to avoid duplicates.
+ */
+export async function upsertSongAnalysis(
+  songId: string,
+  data: {
+    status: 'approved' | 'rejected' | 'pending';
+    justification: string;
+    analyzedBy: string;
+    scriptureReferences?: string[];
+  }
+): Promise<boolean> {
+  await supabase.from('theological_analyses').delete().eq('song_id', songId);
+  const { error } = await supabase.from('theological_analyses').insert({
+    song_id: songId,
+    status: data.status,
+    justification: data.justification || null,
+    analyzed_by: data.analyzedBy || null,
+    analyzed_at: new Date().toISOString(),
+    scripture_references: data.scriptureReferences ?? [],
+  });
+  if (error) { console.error('Error saving analysis:', error); return false; }
   return true;
 }
 

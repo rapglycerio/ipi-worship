@@ -18,6 +18,10 @@ interface SongCardProps {
   song: MasterSong;
   compact?: boolean;
   index?: number;
+  /** When set, links carry ?pl=<id> so the song page knows its playlist context. */
+  playlistId?: string;
+  /** Service key override (transposedKey) — shown instead of the version's key. */
+  overrideKey?: string;
 }
 
 const approvalConfig: Record<ApprovalStatus, { badge: string; icon: typeof ShieldCheck; label: string }> = {
@@ -26,9 +30,12 @@ const approvalConfig: Record<ApprovalStatus, { badge: string; icon: typeof Shiel
   pending: { badge: 'badge-pending', icon: ShieldQuestion, label: 'Pendente' },
 };
 
-export default function SongCard({ song, compact = false, index }: SongCardProps) {
+export default function SongCard({ song, compact = false, index, playlistId, overrideKey }: SongCardProps) {
   const defaultVersion = getDefaultVersion(song);
   if (!defaultVersion) return null;
+
+  const href = playlistId ? `/musica/${song.id}?pl=${playlistId}` : `/musica/${song.id}`;
+  const displayKey = overrideKey || defaultVersion.key;
 
   const approval = song.analysis
     ? approvalConfig[song.analysis.status]
@@ -37,7 +44,7 @@ export default function SongCard({ song, compact = false, index }: SongCardProps
 
   return (
     <Link
-      href={`/musica/${song.id}`}
+      href={href}
       className={`
         group block bg-card border border-border rounded-xl overflow-hidden
         hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5
@@ -91,9 +98,14 @@ export default function SongCard({ song, compact = false, index }: SongCardProps
           {/* Metadata Row */}
           {!compact && (
             <div className="flex items-center gap-3 mt-2 flex-wrap">
-              {/* Key & BPM */}
-              <span className="inline-flex items-center gap-1 text-[11px] font-mono font-semibold text-accent bg-accent-subtle px-2 py-0.5 rounded-md">
-                {defaultVersion.key}
+              {/* Key & BPM — overrideKey (service key) shown filled */}
+              <span
+                title={overrideKey ? 'Tom definido para o culto' : undefined}
+                className={`inline-flex items-center gap-1 text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md ${
+                  overrideKey ? 'bg-accent text-white' : 'text-accent bg-accent-subtle'
+                }`}
+              >
+                {displayKey}
               </span>
               <span className="inline-flex items-center gap-1 text-[11px] text-muted">
                 <Clock className="w-3 h-3" />

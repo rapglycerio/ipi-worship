@@ -3,6 +3,7 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import AuthProvider from "@/components/AuthProvider";
 import InstallBanner from "@/components/InstallBanner";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -34,6 +35,7 @@ export default function RootLayout({
         />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </head>
       <body className="min-h-full flex">
         <AuthProvider>
@@ -43,6 +45,7 @@ export default function RootLayout({
             {children}
           </main>
           <InstallBanner />
+          <ServiceWorkerRegister />
         </AuthProvider>
       </body>
     </html>

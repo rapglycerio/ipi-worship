@@ -6,7 +6,7 @@ import SongCard from '@/components/SongCard';
 import { CalendarDays, Loader2, Share2, Settings2, GripVertical, Trash2, Save, X, Check } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { updatePlaylist, updateArrangementOrders, removeArrangementFromPlaylist } from '@/lib/data';
+import { updatePlaylist, updateArrangementOrders, removeArrangementFromPlaylist, updateArrangementKey } from '@/lib/data';
 
 import {
   DndContext,
@@ -29,7 +29,31 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-function SortableSongCard({ id, song, index, isEditing, onRemove }: { id: string, song: any, index: number, isEditing: boolean, onRemove: (id: string) => void }) {
+// Common keys offered as the "service key" (tom do culto) for a song.
+const KEY_OPTIONS = [
+  'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
+  'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm',
+];
+
+function SortableSongCard({
+  id,
+  song,
+  index,
+  isEditing,
+  onRemove,
+  playlistId,
+  transposedKey,
+  onSetKey,
+}: {
+  id: string;
+  song: any;
+  index: number;
+  isEditing: boolean;
+  onRemove: (id: string) => void;
+  playlistId: string;
+  transposedKey?: string;
+  onSetKey: (id: string, key: string | null) => void;
+}) {
   const {
     attributes,
     listeners,
@@ -49,25 +73,41 @@ function SortableSongCard({ id, song, index, isEditing, onRemove }: { id: string
   return (
     <div ref={setNodeRef} style={style} className={`flex items-stretch gap-2 ${isDragging ? 'opacity-80' : ''}`}>
       {isEditing && (
-        <div 
+        <div
           className="flex-shrink-0 flex items-center justify-center px-1 cursor-grab active:cursor-grabbing text-muted hover:text-foreground touch-none"
-          {...attributes} 
+          {...attributes}
           {...listeners}
         >
           <GripVertical className="w-6 h-6" />
         </div>
       )}
       <div className={`flex-1 min-w-0 ${isEditing ? 'pointer-events-none opacity-90' : ''}`}>
-        <SongCard song={song} index={index} />
+        <SongCard song={song} index={index} playlistId={playlistId} overrideKey={transposedKey} />
       </div>
       {isEditing && (
-        <button 
-          onClick={() => onRemove(id)}
-          className="flex-shrink-0 px-3 flex items-center justify-center text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
-          title="Remover da playlist"
-        >
-          <Trash2 className="w-5 h-5" />
-        </button>
+        <>
+          {/* Service-key picker */}
+          <div className="flex-shrink-0 flex items-center">
+            <select
+              value={transposedKey ?? ''}
+              onChange={(e) => onSetKey(id, e.target.value || null)}
+              title="Tom para este culto"
+              className="h-full bg-background border border-border rounded-xl px-2 text-xs font-mono text-foreground focus:outline-none focus:border-accent cursor-pointer"
+            >
+              <option value="">Tom orig.</option>
+              {KEY_OPTIONS.map((k) => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={() => onRemove(id)}
+            className="flex-shrink-0 px-3 flex items-center justify-center text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
+            title="Remover da playlist"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
+        </>
       )}
     </div>
   );
@@ -84,7 +124,7 @@ export default function SinglePlaylistPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editDate, setEditDate] = useState('');
-  const [editType, setEditType] = useState<'manha' | 'noite' | 'especial'>('manha');
+  const [editType, setEditType] = useState<'manha' | 'noite' | 'especial' | 'estudo'>('manha');
   const [copied, setCopied] = useState(false);
   
   const [optimisticArrangements, setOptimisticArrangements] = useState<any[]>([]);
@@ -154,6 +194,14 @@ export default function SinglePlaylistPage() {
     }
   };
 
+  const handleSetKey = async (arrId: string, key: string | null) => {
+    setOptimisticArrangements(prev =>
+      prev.map(a => (a.id === arrId ? { ...a, transposedKey: key ?? undefined } : a))
+    );
+    await updateArrangementKey(arrId, key);
+    refetch();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -178,7 +226,8 @@ export default function SinglePlaylistPage() {
   const serviceLabel =
     playlist.serviceType === 'manha' ? 'da Manhã' :
     playlist.serviceType === 'noite' ? 'da Noite' :
-    playlist.serviceType === 'especial' ? 'Especial' : playlist.serviceType;
+    playlist.serviceType === 'especial' ? 'Especial' :
+    playlist.serviceType === 'estudo' ? 'de Estudo' : playlist.serviceType;
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -246,6 +295,7 @@ export default function SinglePlaylistPage() {
                     <option value="manha">Manhã</option>
                     <option value="noite">Noite</option>
                     <option value="especial">Especial</option>
+                    <option value="estudo">Estudo</option>
                   </select>
                 </div>
               </div>
@@ -317,13 +367,16 @@ export default function SinglePlaylistPage() {
           <SortableContext items={optimisticArrangements.map(a => a.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-3">
               {optimisticArrangements.map((arr, i) => (
-                <SortableSongCard 
-                  key={arr.id} 
-                  id={arr.id} 
-                  song={arr.song} 
-                  index={i} 
+                <SortableSongCard
+                  key={arr.id}
+                  id={arr.id}
+                  song={arr.song}
+                  index={i}
                   isEditing={isEditing}
                   onRemove={handleRemoveArrangement}
+                  playlistId={playlistId}
+                  transposedKey={arr.transposedKey}
+                  onSetKey={handleSetKey}
                 />
               ))}
               {optimisticArrangements.length === 0 && (

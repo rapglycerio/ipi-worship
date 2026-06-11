@@ -10,11 +10,25 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
     ],
   },
+
+  // O service worker offline (public/sw.js) nunca deve ficar preso no cache do
+  // navegador — assim novas versões do SW são aplicadas no próximo carregamento.
+  async headers() {
+    return [
+      {
+        source: '/sw.js',
+        headers: [
+          { key: 'Content-Type', value: 'application/javascript; charset=utf-8' },
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
 
-// NOTA PWA: next-pwa v5 usa webpack e não é compatível com Turbopack.
-// O manifest.json em /public já garante a instalabilidade da PWA (ícones, standalone).
-// Para service workers offline, use @serwist/next ou @ducanh2912/next-pwa quando
-// suporte oficial ao Turbopack estiver disponível.
+// NOTA PWA: o offline é provido por um service worker escrito à mão em
+// public/sw.js (registrado por ServiceWorkerRegister), sem next-pwa/webpack,
+// pois next-pwa v5 não é compatível com Turbopack. O manifest.json em /public
+// garante a instalabilidade (ícones em /public/icons, standalone).
