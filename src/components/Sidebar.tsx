@@ -114,7 +114,14 @@ export default function Sidebar() {
   return (
     <>
       {/* ── Mobile Top Bar ─────────────────────────────────────── */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 flex items-center px-3 gap-3 bg-card border-b border-border no-print">
+      <header
+        className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center px-3 gap-3 bg-card border-b border-border no-print"
+        style={{
+          // Modo PWA standalone: empurra o conteúdo para baixo da barra de status do iOS
+          paddingTop: 'env(safe-area-inset-top)',
+          height: 'calc(3.5rem + env(safe-area-inset-top))',
+        }}
+      >
         <button
           onClick={() => setShowDrawer(true)}
           className="w-11 h-11 flex items-center justify-center rounded-xl text-muted hover:bg-elevated transition-colors cursor-pointer shrink-0"
@@ -147,7 +154,7 @@ export default function Sidebar() {
           />
           {/* Drawer panel */}
           <div className="fixed top-0 left-0 bottom-0 z-50 w-[280px] md:hidden bg-card flex flex-col shadow-2xl animate-slide-up"
-            style={{ animation: 'slideIn 250ms ease-out forwards' }}
+            style={{ animation: 'slideIn 250ms ease-out forwards', paddingTop: 'env(safe-area-inset-top)' }}
           >
             {/* Drawer header */}
             <div className="flex items-center h-14 border-b border-border px-3 gap-2 shrink-0">

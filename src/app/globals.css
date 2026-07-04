@@ -366,6 +366,7 @@ body {
 /* Mobile main content: clear top bar (56px) + bottom tab bar (56px) + safe area */
 @media (max-width: 767px) {
   main {
+    padding-top: calc(56px + env(safe-area-inset-top)) !important;
     padding-bottom: calc(56px + env(safe-area-inset-bottom)) !important;
   }
 }
@@ -373,7 +374,7 @@ body {
 /* Mobile: ensure top bar doesn't clip fixed children */
 @media (max-width: 767px) {
   .glass-strong.sticky {
-    top: 56px !important;
+    top: calc(56px + env(safe-area-inset-top)) !important;
   }
 }
 
