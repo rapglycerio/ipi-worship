@@ -8,15 +8,31 @@ import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // Trava o zoom por pinça/duplo-toque no PWA standalone (iOS respeita em
+  // modo app); ampliação de cifra fica por conta dos presets de fonte.
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
   themeColor: "#00B0EF",
 };
 
+const SITE_URL = process.env.NEXTAUTH_URL || "https://ipi-worship.vercel.app";
+
 export const metadata: Metadata = {
-  title: "IPI do Imirim - Louvor & Liturgia",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "IPI do Imirim - Louvor & Liturgia",
+    template: "%s · IPI Louvor",
+  },
   description:
     "Plataforma de gestão litúrgica, cifras modulares e análise teológica de louvores da Igreja Presbiteriana Independente do Imirim.",
   manifest: "/manifest.json",
+  openGraph: {
+    siteName: "IPI do Imirim - Louvor & Liturgia",
+    type: "website",
+    locale: "pt_BR",
+    images: [{ url: "/icons/icon-512x512.png", width: 512, height: 512 }],
+  },
 };
 
 export default function RootLayout({
