@@ -8,6 +8,10 @@ import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // Trava o zoom por pinça/duplo-toque no PWA standalone (iOS respeita em
+  // modo app); ampliação de cifra fica por conta dos presets de fonte.
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
   themeColor: "#00B0EF",
 };

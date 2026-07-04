@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import { useSongs, usePlaylists } from '@/hooks/useData';
 import SongCard from '@/components/SongCard';
 import { getDefaultVersion } from '@/data/mock-songs';
@@ -106,6 +107,8 @@ function SortableSongCard({
 export default function SinglePlaylistPage() {
   const params = useParams();
   const router = useRouter();
+  const { data: session } = useSession();
+  const isLoggedIn = !!session?.user;
   const { songs, loading: songsLoading } = useSongs();
   const { playlists, loading: playlistsLoading, refetch } = usePlaylists();
   
@@ -316,13 +319,15 @@ export default function SinglePlaylistPage() {
               </>
             ) : (
               <>
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="w-10 h-10 rounded-xl bg-elevated hover:bg-border flex items-center justify-center transition-colors shrink-0 cursor-pointer text-muted hover:text-foreground"
-                  aria-label="Editar playlist"
-                >
-                  <Settings2 className="w-5 h-5" />
-                </button>
+                {isLoggedIn && (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="w-10 h-10 rounded-xl bg-elevated hover:bg-border flex items-center justify-center transition-colors shrink-0 cursor-pointer text-muted hover:text-foreground"
+                    aria-label="Editar playlist"
+                  >
+                    <Settings2 className="w-5 h-5" />
+                  </button>
+                )}
                 <button
                   onClick={handleShare}
                   className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors shrink-0 cursor-pointer ${

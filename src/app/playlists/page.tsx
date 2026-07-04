@@ -396,7 +396,7 @@ export default function PlaylistsPage() {
               <p className="text-sm text-muted mb-4">
                 {tab === 'upcoming' ? 'Crie uma playlist para o próximo culto.' : 'As playlists passadas aparecerão aqui.'}
               </p>
-              {tab === 'upcoming' && (
+              {tab === 'upcoming' && isLoggedIn && (
                 <button
                   onClick={openCreate}
                   className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-semibold cursor-pointer hover:bg-accent/90 transition-colors"
