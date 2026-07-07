@@ -23,6 +23,7 @@ import {
   UserCog,
   ChevronRight,
   Menu,
+  HelpCircle,
 } from 'lucide-react';
 
 // Desktop nav items (full list)
@@ -33,6 +34,7 @@ const navItems = [
   { href: '/playlists', label: 'Playlists',           icon: Music },
   { href: '/analises',  label: 'Análises de Louvor',  icon: ClipboardCheck },
   { href: '/importar',  label: 'Importar Cifra',      icon: Upload },
+  { href: '/como-usar', label: 'Como Usar',           icon: HelpCircle },
 ];
 
 // Mobile bottom tab items (most-used 4 + Mais)
@@ -45,9 +47,10 @@ const bottomTabItems = [
 
 // Items shown in the "Mais" bottom sheet
 const maisItems = [
-  { href: '/artistas', label: 'Artistas',       icon: Users },
-  { href: '/analises', label: 'Análises',        icon: ClipboardCheck },
-  { href: '/importar', label: 'Importar Cifra',  icon: Upload },
+  { href: '/artistas',  label: 'Artistas',        icon: Users },
+  { href: '/analises',  label: 'Análises',        icon: ClipboardCheck },
+  { href: '/importar',  label: 'Importar Cifra',  icon: Upload },
+  { href: '/como-usar', label: 'Como Usar',       icon: HelpCircle },
 ];
 
 const COLLAPSED_KEY = 'sidebar_collapsed';
