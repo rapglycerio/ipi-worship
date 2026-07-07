@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useSongs, usePlaylists } from '@/hooks/useData';
 import SongCard from '@/components/SongCard';
 import {
@@ -8,9 +9,55 @@ import {
   Loader2,
   ChevronRight,
   Clock,
+  HelpCircle,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import type { Playlist } from '@/types';
+
+const HELP_INVITE_KEY = 'help_invite_dismissed';
+
+/** Convite discreto ao guia, exibido até o usuário abri-lo ou dispensá-lo. */
+function HelpInviteCard() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    // Lê o localStorage só após montar para não divergir do HTML do servidor
+    setVisible(!localStorage.getItem(HELP_INVITE_KEY));
+  }, []);
+
+  const dismiss = () => {
+    localStorage.setItem(HELP_INVITE_KEY, '1');
+    setVisible(false);
+  };
+
+  if (!visible) return null;
+
+  return (
+    <div className="mx-5 md:mx-8 mb-6 flex items-center gap-3 bg-card border border-border rounded-2xl p-4">
+      <div className="w-10 h-10 rounded-xl bg-accent-subtle flex items-center justify-center shrink-0">
+        <HelpCircle className="w-5 h-5 text-accent" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-foreground">Primeira vez por aqui?</p>
+        <Link
+          href="/como-usar"
+          onClick={dismiss}
+          className="text-xs text-accent hover:underline cursor-pointer"
+        >
+          Veja como instalar no celular, mudar o tom e seguir o repertório →
+        </Link>
+      </div>
+      <button
+        onClick={dismiss}
+        className="p-1.5 text-subtle hover:text-foreground transition-colors cursor-pointer shrink-0"
+        aria-label="Dispensar convite"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
 
 function getNextSevenDays(): { start: Date; end: Date } {
   const start = new Date();
@@ -82,6 +129,7 @@ export default function Home() {
         </div>
       </section>
 
+      <HelpInviteCard />
 
       {/* Upcoming playlists */}
       <section className="px-5 md:px-8 pb-12">
