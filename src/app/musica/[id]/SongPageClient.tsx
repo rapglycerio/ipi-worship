@@ -172,6 +172,14 @@ interface AddToPlaylistModalProps {
   onClose: () => void;
 }
 
+/** Playlists com culto já passado somem daqui — só fixas (sem data) e futuras. */
+function isAddable(pl: Playlist): boolean {
+  if (!pl.serviceDate) return true;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(pl.serviceDate + 'T12:00:00') >= today;
+}
+
 function AddToPlaylistModal({ songId, versionId, onClose }: AddToPlaylistModalProps) {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
@@ -184,6 +192,7 @@ function AddToPlaylistModal({ songId, versionId, onClose }: AddToPlaylistModalPr
     new Date().toISOString().split('T')[0]
   );
   const [creating, setCreating] = useState(false);
+  const addablePlaylists = playlists.filter(isAddable);
 
   useEffect(() => {
     async function load() {
@@ -263,11 +272,11 @@ function AddToPlaylistModal({ songId, versionId, onClose }: AddToPlaylistModalPr
             <div className="flex justify-center py-8">
               <Loader2 className="w-5 h-5 text-accent animate-spin" />
             </div>
-          ) : playlists.length === 0 ? (
-            <p className="text-center text-sm text-subtle py-8">Nenhuma playlist encontrada.</p>
+          ) : addablePlaylists.length === 0 ? (
+            <p className="text-center text-sm text-subtle py-8">Nenhuma playlist futura ou fixa.</p>
           ) : (
             <div className="divide-y divide-border">
-              {playlists.map((pl) => (
+              {addablePlaylists.map((pl) => (
                 <div key={pl.id} className="flex items-center justify-between px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{pl.name}</p>

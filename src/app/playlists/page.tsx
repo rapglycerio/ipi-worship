@@ -289,7 +289,9 @@ export default function PlaylistsPage() {
                 </button>
               </div>
               <div className="max-h-72 overflow-y-auto divide-y divide-border">
-                {playlists.map((pl) => (
+                {upcomingPlaylists.length === 0 ? (
+                  <p className="text-center text-sm text-subtle py-8">Nenhuma playlist futura ou fixa.</p>
+                ) : upcomingPlaylists.map((pl) => (
                   <button
                     key={pl.id}
                     onClick={async () => {
