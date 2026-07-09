@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS playlists (
   name         TEXT        NOT NULL,
   service_type TEXT        NOT NULL DEFAULT 'manha'
                            CHECK (service_type IN ('manha','noite','especial','estudo')),
-  service_date DATE        NOT NULL,
+  service_date DATE, -- null = playlist fixa, sem culto (nullable desde 2026-07-09)
   created_by   TEXT        DEFAULT 'Sistema',
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()

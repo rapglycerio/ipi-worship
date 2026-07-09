@@ -39,6 +39,7 @@ import {
   Clock,
   Lightbulb,
   ListPlus,
+  Pin,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
@@ -56,7 +57,7 @@ type ServiceType = 'manha' | 'noite' | 'especial' | 'estudo';
 interface PlaylistFormData {
   name: string;
   serviceType: ServiceType;
-  serviceDate: string;
+  serviceDate: string | null;
 }
 
 // =============================================
@@ -95,13 +96,18 @@ export default function PlaylistsPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // Playlists sem data (repertórios fixos) ficam sempre no topo de "Próximas"
   const upcomingPlaylists = playlists
-    .filter((pl) => new Date(pl.serviceDate + 'T12:00:00') >= today)
-    .sort((a, b) => a.serviceDate.localeCompare(b.serviceDate));
+    .filter((pl) => !pl.serviceDate || new Date(pl.serviceDate + 'T12:00:00') >= today)
+    .sort((a, b) => {
+      if (!a.serviceDate) return b.serviceDate ? -1 : a.name.localeCompare(b.name);
+      if (!b.serviceDate) return 1;
+      return a.serviceDate.localeCompare(b.serviceDate);
+    });
 
   const pastPlaylists = playlists
-    .filter((pl) => new Date(pl.serviceDate + 'T12:00:00') < today)
-    .sort((a, b) => b.serviceDate.localeCompare(a.serviceDate));
+    .filter((pl) => pl.serviceDate && new Date(pl.serviceDate + 'T12:00:00') < today)
+    .sort((a, b) => (b.serviceDate ?? '').localeCompare(a.serviceDate ?? ''));
 
   const visiblePlaylists = tab === 'upcoming' ? upcomingPlaylists : pastPlaylists;
 
@@ -298,7 +304,7 @@ export default function PlaylistsPage() {
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{pl.name}</p>
-                      <p className="text-xs text-muted">{new Date(pl.serviceDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })}</p>
+                      <p className="text-xs text-muted">{pl.serviceDate ? new Date(pl.serviceDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }) : 'Sem data'}</p>
                     </div>
                     <Plus className="w-4 h-4 text-accent shrink-0" />
                   </button>
@@ -337,9 +343,16 @@ export default function PlaylistsPage() {
                       </h3>
                       <p className="text-xs text-muted mt-0.5 capitalize">{formattedDate}</p>
                       <div className="flex items-center gap-3 mt-2">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-accent bg-accent-subtle px-2 py-0.5 rounded-md">
-                          Culto {serviceLabel}
-                        </span>
+                        {pl.serviceDate ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-accent bg-accent-subtle px-2 py-0.5 rounded-md">
+                            Culto {serviceLabel}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-warning bg-warning/10 px-2 py-0.5 rounded-md">
+                            <Pin className="w-2.5 h-2.5" />
+                            Fixa
+                          </span>
+                        )}
                         <span className="flex items-center gap-1 text-[11px] text-muted">
                           <Music2 className="w-3 h-3" />
                           {songCount} música{songCount !== 1 ? 's' : ''}
@@ -758,13 +771,15 @@ function PlaylistModal({
     (playlist?.serviceType as ServiceType) ?? 'manha'
   );
   const [serviceDate, setServiceDate] = useState(playlist?.serviceDate ?? '');
+  // Playlist fixa: sem data de culto (ex.: repertório de músicas novas)
+  const [noDate, setNoDate] = useState(playlist ? playlist.serviceDate === null : false);
 
-  const isValid = name.trim() !== '' && serviceDate !== '';
+  const isValid = name.trim() !== '' && (noDate || serviceDate !== '');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValid) return;
-    await onSave({ name: name.trim(), serviceType, serviceDate });
+    await onSave({ name: name.trim(), serviceType, serviceDate: noDate ? null : serviceDate });
   };
 
   return (
@@ -820,15 +835,27 @@ function PlaylistModal({
 
           <div>
             <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">
-              Data *
+              Data {noDate ? '' : '*'}
             </label>
             <input
               type="date"
-              value={serviceDate}
+              value={noDate ? '' : serviceDate}
               onChange={(e) => setServiceDate(e.target.value)}
-              className="w-full px-3 py-2.5 bg-elevated border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent/50 transition-all cursor-pointer"
-              required
+              disabled={noDate}
+              className="w-full px-3 py-2.5 bg-elevated border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent/50 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              required={!noDate}
             />
+            <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={noDate}
+                onChange={(e) => setNoDate(e.target.checked)}
+                className="w-4 h-4 rounded border-border accent-[var(--accent)] cursor-pointer"
+              />
+              <span className="text-xs text-muted">
+                Playlist fixa (sem data de culto) — fica sempre no topo, ex.: músicas novas
+              </span>
+            </label>
           </div>
         </div>
 
@@ -977,7 +1004,8 @@ function serviceTypeLabel(type: string, prefix?: string): string {
   return labels[type] ?? type;
 }
 
-function formatDate(dateStr: string): string {
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return 'Repertório fixo — sem data de culto';
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: 'numeric',

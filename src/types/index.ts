@@ -185,8 +185,8 @@ export interface Playlist {
   name: string; // e.g. "Domingo Manhã - 20/04/2025"
   /** Service type */
   serviceType: 'manha' | 'noite' | 'especial' | 'estudo';
-  /** Date of service */
-  serviceDate: string; // ISO date
+  /** Date of service; null = playlist fixa, sem culto (ex.: repertório de músicas novas) */
+  serviceDate: string | null; // ISO date
   /** Ordered list of arrangements */
   arrangements: WorshipArrangement[];
   /** Who created this playlist */

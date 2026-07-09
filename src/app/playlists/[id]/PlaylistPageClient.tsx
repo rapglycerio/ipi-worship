@@ -129,7 +129,7 @@ export default function SinglePlaylistPage() {
   useEffect(() => {
     if (playlist && !isEditing) {
       setEditName(playlist.name);
-      setEditDate(playlist.serviceDate);
+      setEditDate(playlist.serviceDate ?? '');
       setEditType(playlist.serviceType as any);
       
       const arrWithSongs = playlist.arrangements.map((arr) => {
@@ -172,7 +172,8 @@ export default function SinglePlaylistPage() {
   const handleSaveDetails = async () => {
     await updatePlaylist(playlistId, {
       name: editName,
-      serviceDate: editDate,
+      // Campo de data vazio = playlist fixa (sem data de culto)
+      serviceDate: editDate || null,
       serviceType: editType,
     });
     setIsEditing(false);

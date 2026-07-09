@@ -227,7 +227,7 @@ export async function fetchPlaylistById(id: string): Promise<Playlist | null> {
 export async function createPlaylist(data: {
   name: string;
   serviceType: string;
-  serviceDate: string;
+  serviceDate: string | null;
 }): Promise<string | null> {
   const { data: result, error } = await supabase
     .from('playlists')
@@ -249,9 +249,9 @@ export async function createPlaylist(data: {
 
 export async function updatePlaylist(
   id: string,
-  data: { name?: string; serviceType?: string; serviceDate?: string }
+  data: { name?: string; serviceType?: string; serviceDate?: string | null }
 ): Promise<boolean> {
-  const patch: Record<string, string> = {};
+  const patch: Record<string, string | null> = {};
   if (data.name !== undefined) patch.name = data.name;
   if (data.serviceType !== undefined) patch.service_type = data.serviceType;
   if (data.serviceDate !== undefined) patch.service_date = data.serviceDate;
