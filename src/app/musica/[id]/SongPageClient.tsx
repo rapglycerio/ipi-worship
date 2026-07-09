@@ -272,7 +272,7 @@ function AddToPlaylistModal({ songId, versionId, onClose }: AddToPlaylistModalPr
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{pl.name}</p>
                     <p className="text-[10px] text-subtle">
-                      {new Date(pl.serviceDate + 'T00:00:00').toLocaleDateString('pt-BR')} · {pl.arrangements.length} música{pl.arrangements.length !== 1 ? 's' : ''}
+                      {pl.serviceDate ? `${new Date(pl.serviceDate + 'T00:00:00').toLocaleDateString('pt-BR')} · ` : 'Fixa · '}{pl.arrangements.length} música{pl.arrangements.length !== 1 ? 's' : ''}
                     </p>
                   </div>
                   <button
@@ -794,8 +794,8 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
         const { fetchAllPlaylists } = await import('@/lib/data');
         const allPlaylists = await fetchAllPlaylists();
         const playlistsWithSong = allPlaylists
-          .filter((pl) => pl.arrangements.some((a) => a.masterSongId === id))
-          .sort((a, b) => b.serviceDate.localeCompare(a.serviceDate));
+          .filter((pl) => pl.serviceDate && pl.arrangements.some((a) => a.masterSongId === id))
+          .sort((a, b) => (b.serviceDate ?? '').localeCompare(a.serviceDate ?? ''));
         if (playlistsWithSong.length > 0) {
           setLastPlayedDate(playlistsWithSong[0].serviceDate);
         }

@@ -90,10 +90,11 @@ export default function Home() {
   const { start, end } = getNextSevenDays();
   const upcomingPlaylists = playlists
     .filter((pl) => {
+      if (!pl.serviceDate) return false; // playlists fixas não aparecem na home
       const d = new Date(pl.serviceDate + 'T12:00:00');
       return d >= start && d <= end;
     })
-    .sort((a, b) => a.serviceDate.localeCompare(b.serviceDate));
+    .sort((a, b) => (a.serviceDate ?? '').localeCompare(b.serviceDate ?? ''));
 
   if (loading) {
     return (
@@ -187,7 +188,7 @@ function PlaylistSection({
           <div className="min-w-0">
             <h2 className="text-base font-bold text-foreground truncate">{playlist.name}</h2>
             <p className="text-xs text-muted truncate">
-              {formatShortDate(playlist.serviceDate)} · Culto {serviceLabel(playlist.serviceType)}
+              {playlist.serviceDate ? `${formatShortDate(playlist.serviceDate)} · ` : ''}Culto {serviceLabel(playlist.serviceType)}
             </p>
           </div>
         </div>

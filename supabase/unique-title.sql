@@ -6,7 +6,7 @@
 -- Verificado em 02/07/2026: nenhuma duplicata existente, seguro aplicar.
 --
 -- Normalização: minúsculas + trim + espaços internos colapsados.
--- Aplicar no SQL Editor do Supabase (ou via CLI).
+-- ✅ APLICADO em produção em 2026-07-09 (migration unique_normalized_song_title).
 -- =============================================================
 
 create unique index if not exists master_songs_normalized_title_key
