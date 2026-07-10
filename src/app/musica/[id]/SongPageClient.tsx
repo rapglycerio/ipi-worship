@@ -39,6 +39,7 @@ import {
   Play,
   Pause,
   Gauge,
+  Lock,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -180,7 +181,19 @@ function isAddable(pl: Playlist): boolean {
   return new Date(pl.serviceDate + 'T12:00:00') >= today;
 }
 
+/** Junta playlists públicas + particulares do usuário logado (mesma playlist nunca aparece nas duas). */
+async function loadAllVisiblePlaylists(isLoggedIn: boolean): Promise<Playlist[]> {
+  const { fetchAllPlaylists, fetchPrivatePlaylists } = await import('@/lib/data');
+  const [publicData, privateData] = await Promise.all([
+    fetchAllPlaylists(),
+    isLoggedIn ? fetchPrivatePlaylists() : Promise.resolve([]),
+  ]);
+  return [...privateData, ...publicData];
+}
+
 function AddToPlaylistModal({ songId, versionId, onClose }: AddToPlaylistModalProps) {
+  const { data: session } = useSession();
+  const isLoggedIn = !!session?.user;
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
   const [addingId, setAddingId] = useState<string | null>(null);
@@ -197,8 +210,7 @@ function AddToPlaylistModal({ songId, versionId, onClose }: AddToPlaylistModalPr
   useEffect(() => {
     async function load() {
       try {
-        const { fetchAllPlaylists } = await import('@/lib/data');
-        setPlaylists(await fetchAllPlaylists());
+        setPlaylists(await loadAllVisiblePlaylists(isLoggedIn));
       } catch {
         /* ignore */
       } finally {
@@ -206,18 +218,18 @@ function AddToPlaylistModal({ songId, versionId, onClose }: AddToPlaylistModalPr
       }
     }
     load();
-  }, []);
+  }, [isLoggedIn]);
 
   async function handleAdd(playlistId: string) {
     setAddingId(playlistId);
     try {
-      const { addSongToPlaylist, fetchAllPlaylists } = await import('@/lib/data');
+      const { addSongToPlaylist } = await import('@/lib/data');
       const pl = playlists.find((p) => p.id === playlistId);
       const sortOrder = pl ? pl.arrangements.length : 0;
       await addSongToPlaylist({ playlistId, masterSongId: songId, versionId, sortOrder });
       setAddedIds((prev) => new Set([...prev, playlistId]));
       // Refresh playlists to update arrangement counts
-      setPlaylists(await fetchAllPlaylists());
+      setPlaylists(await loadAllVisiblePlaylists(isLoggedIn));
     } catch {
       alert('Erro ao adicionar à playlist.');
     } finally {
@@ -229,7 +241,7 @@ function AddToPlaylistModal({ songId, versionId, onClose }: AddToPlaylistModalPr
     if (!newName.trim() || creating) return;
     setCreating(true);
     try {
-      const { createPlaylist, addSongToPlaylist, fetchAllPlaylists } = await import('@/lib/data');
+      const { createPlaylist, addSongToPlaylist } = await import('@/lib/data');
       const playlistId = await createPlaylist({
         name: newName.trim(),
         serviceType: newServiceType,
@@ -238,7 +250,7 @@ function AddToPlaylistModal({ songId, versionId, onClose }: AddToPlaylistModalPr
       if (playlistId) {
         await addSongToPlaylist({ playlistId, masterSongId: songId, versionId, sortOrder: 0 });
         setAddedIds((prev) => new Set([...prev, playlistId]));
-        setPlaylists(await fetchAllPlaylists());
+        setPlaylists(await loadAllVisiblePlaylists(isLoggedIn));
         setShowCreate(false);
         setNewName('');
       } else {
@@ -279,9 +291,12 @@ function AddToPlaylistModal({ songId, versionId, onClose }: AddToPlaylistModalPr
               {addablePlaylists.map((pl) => (
                 <div key={pl.id} className="flex items-center justify-between px-4 py-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{pl.name}</p>
+                    <p className="text-sm font-medium text-foreground truncate flex items-center gap-1.5">
+                      {pl.isPrivate && <Lock className="w-3 h-3 text-subtle shrink-0" />}
+                      <span className="truncate">{pl.name}</span>
+                    </p>
                     <p className="text-[10px] text-subtle">
-                      {pl.serviceDate ? `${new Date(pl.serviceDate + 'T00:00:00').toLocaleDateString('pt-BR')} · ` : 'Fixa · '}{pl.arrangements.length} música{pl.arrangements.length !== 1 ? 's' : ''}
+                      {pl.serviceDate ? `${new Date(pl.serviceDate + 'T00:00:00').toLocaleDateString('pt-BR')} · ` : pl.isPrivate ? 'Particular · ' : 'Fixa · '}{pl.arrangements.length} música{pl.arrangements.length !== 1 ? 's' : ''}
                     </p>
                   </div>
                   <button

@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import type { MasterSong, Playlist } from '@/types';
-import { fetchAllSongs, searchSongs as searchSongsApi, fetchAllPlaylists } from '@/lib/data';
+import { fetchAllSongs, searchSongs as searchSongsApi, fetchAllPlaylists, fetchPrivatePlaylists } from '@/lib/data';
 
 /**
  * Hook to fetch and cache songs from Supabase.
@@ -67,13 +68,19 @@ export function useSongs() {
  * Hook to fetch playlists from Supabase.
  */
 export function usePlaylists() {
+  const { data: session } = useSession();
+  const ownerEmail = session?.user?.email ?? null;
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadPlaylists = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchAllPlaylists();
+      const [publicData, privateData] = await Promise.all([
+        fetchAllPlaylists(),
+        ownerEmail ? fetchPrivatePlaylists() : Promise.resolve([]),
+      ]);
+      const data = [...privateData, ...publicData];
       if (data.length > 0) {
         setPlaylists(data);
       } else {
@@ -87,7 +94,7 @@ export function usePlaylists() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [ownerEmail]);
 
   useEffect(() => {
     loadPlaylists();

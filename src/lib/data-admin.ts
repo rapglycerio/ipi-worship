@@ -58,3 +58,14 @@ export async function deletePlaylist(id: string): Promise<boolean> {
   if (error) { console.error('deletePlaylist:', error); return false; }
   return true;
 }
+
+/** Playlists particulares do dono — RLS bloqueia isso para o cliente anônimo. */
+export async function getPrivatePlaylistsForOwner(email: string): Promise<unknown[]> {
+  const { data, error } = await supabaseAdmin
+    .from('playlists')
+    .select('*, worship_arrangements(*)')
+    .eq('is_private', true)
+    .eq('owner_email', email);
+  if (error) { console.error('getPrivatePlaylistsForOwner:', error); return []; }
+  return data ?? [];
+}

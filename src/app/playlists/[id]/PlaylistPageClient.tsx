@@ -4,11 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSongs, usePlaylists } from '@/hooks/useData';
 import SongCard from '@/components/SongCard';
+import AddSongModal from '@/components/AddSongModal';
 import { getDefaultVersion } from '@/data/mock-songs';
-import { CalendarDays, Loader2, Share2, Settings2, GripVertical, Trash2, Save, X, Check } from 'lucide-react';
+import { CalendarDays, Loader2, Share2, Settings2, GripVertical, Trash2, Save, X, Check, PlusCircle, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { updatePlaylist, updateArrangementOrders, removeArrangementFromPlaylist } from '@/lib/data';
+import { updatePlaylist, updateArrangementOrders, removeArrangementFromPlaylist, addSongToPlaylist } from '@/lib/data';
+import type { MasterSong } from '@/types';
 
 import {
   DndContext,
@@ -122,6 +124,7 @@ export default function SinglePlaylistPage() {
   
   const [optimisticArrangements, setOptimisticArrangements] = useState<any[]>([]);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [showAddSong, setShowAddSong] = useState(false);
 
   const playlistId = params.id as string;
   const playlist = playlists.find(p => p.id === playlistId);
@@ -186,6 +189,36 @@ export default function SinglePlaylistPage() {
       await removeArrangementFromPlaylist(arrId);
       refetch();
     }
+  };
+
+  const handleAddSong = async (song: MasterSong) => {
+    const version = song.versions.find((v) => v.isDefault) ?? song.versions[0];
+    if (!version) return;
+
+    const newId = await addSongToPlaylist({
+      playlistId,
+      masterSongId: song.id,
+      versionId: version.id,
+      sortOrder: optimisticArrangements.length,
+    });
+
+    if (newId) {
+      setOptimisticArrangements((prev) => [
+        ...prev,
+        {
+          id: newId,
+          versionId: version.id,
+          masterSongId: song.id,
+          blockOrder: [],
+          customDirections: undefined,
+          transposedKey: undefined,
+          createdAt: new Date().toISOString(),
+          song,
+        },
+      ]);
+    }
+    setShowAddSong(false);
+    refetch();
   };
 
 
@@ -292,7 +325,14 @@ export default function SinglePlaylistPage() {
                   {playlist.name}
                 </h1>
                 <div className="flex items-center gap-3 mt-1">
-                  <span className="text-xs text-muted capitalize">Culto {serviceLabel}</span>
+                  {playlist.isPrivate ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-muted">
+                      <Lock className="w-3 h-3" />
+                      Particular — só você vê
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted capitalize">Culto {serviceLabel}</span>
+                  )}
                   <span className="text-[10px] text-subtle">•</span>
                   <span className="text-xs text-muted">Criado por {playlist.createdBy}</span>
                 </div>
@@ -349,7 +389,18 @@ export default function SinglePlaylistPage() {
       <div className="px-5 md:px-8 pb-12">
         <p className="text-[10px] font-bold uppercase tracking-widest text-subtle mb-3 flex items-center justify-between">
           <span>Ordem do Culto</span>
-          {isEditing && <span className="text-accent normal-case font-normal text-xs">Arraste para reordenar</span>}
+          <span className="flex items-center gap-3">
+            {isEditing && <span className="text-accent normal-case font-normal text-xs">Arraste para reordenar</span>}
+            {isLoggedIn && !isEditing && (
+              <button
+                onClick={() => setShowAddSong(true)}
+                className="flex items-center gap-1.5 text-accent normal-case font-semibold text-xs cursor-pointer hover:text-accent/80 transition-colors"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                Adicionar
+              </button>
+            )}
+          </span>
         </p>
         
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -369,6 +420,14 @@ export default function SinglePlaylistPage() {
               {optimisticArrangements.length === 0 && (
                 <div className="text-center p-8 border border-dashed border-border rounded-xl">
                   <p className="text-muted text-sm">Nenhuma música nesta playlist.</p>
+                  {isLoggedIn && (
+                    <button
+                      onClick={() => setShowAddSong(true)}
+                      className="mt-3 text-xs text-accent hover:underline cursor-pointer"
+                    >
+                      Adicionar músicas
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -395,6 +454,15 @@ export default function SinglePlaylistPage() {
           </DragOverlay>
         </DndContext>
       </div>
+
+      {showAddSong && (
+        <AddSongModal
+          songs={songs}
+          existingIds={optimisticArrangements.map((a) => a.masterSongId)}
+          onAdd={handleAddSong}
+          onClose={() => setShowAddSong(false)}
+        />
+      )}
     </div>
   );
 }

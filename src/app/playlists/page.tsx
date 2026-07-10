@@ -1,24 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { searchRank } from '@/lib/search';
 import { useRouter } from 'next/navigation';
 import { usePlaylists, useSongs } from '@/hooks/useData';
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-  arrayMove,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import {
   CalendarDays,
   ListMusic,
@@ -26,32 +10,21 @@ import {
   ChevronRight,
   Music2,
   Users,
-  GripVertical,
   Pencil,
-  Trash2,
   X,
   Save,
   Loader2,
-  PlusCircle,
-  Search,
-  Share2,
-  Check,
   History,
   Clock,
   Lightbulb,
   ListPlus,
   Pin,
+  Lock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import type { Playlist, WorshipArrangement, MasterSong, SongSuggestion } from '@/types';
-import {
-  createPlaylist,
-  updatePlaylist,
-  addSongToPlaylist,
-  removeArrangementFromPlaylist,
-  updateArrangementOrders,
-} from '@/lib/data';
+import type { Playlist, SongSuggestion } from '@/types';
+import { createPlaylist, updatePlaylist } from '@/lib/data';
 
 type ServiceType = 'manha' | 'noite' | 'especial' | 'estudo';
 
@@ -59,7 +32,11 @@ interface PlaylistFormData {
   name: string;
   serviceType: ServiceType;
   serviceDate: string | null;
+  isPrivate: boolean;
 }
+
+// Usado para desempatar playlists no mesmo dia: manhã sempre antes.
+const SERVICE_TYPE_ORDER: Record<string, number> = { manha: 0, especial: 1, estudo: 2, noite: 3 };
 
 // =============================================
 // Main page
@@ -97,18 +74,23 @@ export default function PlaylistsPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Playlists sem data (repertórios fixos) ficam sempre no topo de "Próximas"
+  // Playlists sem data (repertórios fixos e particulares) ficam sempre no topo de "Próximas"
   const upcomingPlaylists = playlists
     .filter((pl) => !pl.serviceDate || new Date(pl.serviceDate + 'T12:00:00') >= today)
     .sort((a, b) => {
       if (!a.serviceDate) return b.serviceDate ? -1 : a.name.localeCompare(b.name);
       if (!b.serviceDate) return 1;
-      return a.serviceDate.localeCompare(b.serviceDate);
+      const dateCmp = a.serviceDate.localeCompare(b.serviceDate);
+      // No mesmo dia, manhã sempre antes de noite
+      return dateCmp !== 0 ? dateCmp : (SERVICE_TYPE_ORDER[a.serviceType] ?? 99) - (SERVICE_TYPE_ORDER[b.serviceType] ?? 99);
     });
 
   const pastPlaylists = playlists
     .filter((pl) => pl.serviceDate && new Date(pl.serviceDate + 'T12:00:00') < today)
-    .sort((a, b) => (b.serviceDate ?? '').localeCompare(a.serviceDate ?? ''));
+    .sort((a, b) => {
+      const dateCmp = (b.serviceDate ?? '').localeCompare(a.serviceDate ?? '');
+      return dateCmp !== 0 ? dateCmp : (SERVICE_TYPE_ORDER[a.serviceType] ?? 99) - (SERVICE_TYPE_ORDER[b.serviceType] ?? 99);
+    });
 
   const visiblePlaylists = tab === 'upcoming' ? upcomingPlaylists : pastPlaylists;
 
@@ -127,17 +109,22 @@ export default function PlaylistsPage() {
   const handleSave = async (data: PlaylistFormData) => {
     setSaving(true);
     try {
+      const ownerEmail = data.isPrivate ? (session?.user?.email ?? null) : null;
       if (editingPlaylist) {
         await updatePlaylist(editingPlaylist.id, {
           name: data.name,
           serviceType: data.serviceType,
           serviceDate: data.serviceDate,
+          isPrivate: data.isPrivate,
+          ownerEmail,
         });
       } else {
         await createPlaylist({
           name: data.name,
           serviceType: data.serviceType,
           serviceDate: data.serviceDate,
+          isPrivate: data.isPrivate,
+          ownerEmail,
         });
       }
       await refetch();
@@ -350,6 +337,11 @@ export default function PlaylistsPage() {
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-accent bg-accent-subtle px-2 py-0.5 rounded-md">
                             Culto {serviceLabel}
                           </span>
+                        ) : pl.isPrivate ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted bg-elevated px-2 py-0.5 rounded-md">
+                            <Lock className="w-2.5 h-2.5" />
+                            Particular
+                          </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-warning bg-warning/10 px-2 py-0.5 rounded-md">
                             <Pin className="w-2.5 h-2.5" />
@@ -451,310 +443,6 @@ export default function PlaylistsPage() {
 }
 
 // =============================================
-// Detail view
-// =============================================
-
-function PlaylistDetail({
-  playlist,
-  songs,
-  onBack,
-  onEditPlaylist,
-  onRefetch,
-}: {
-  playlist: Playlist;
-  songs: MasterSong[];
-  onBack: () => void;
-  onEditPlaylist: (pl: Playlist) => void;
-  onRefetch: () => Promise<void>;
-}) {
-  const { data: session } = useSession();
-  const isLoggedIn = !!session?.user;
-  const [arrangements, setArrangements] = useState<WorshipArrangement[]>(playlist.arrangements);
-  const [showAddSong, setShowAddSong] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  const handleShare = async () => {
-    const url = `${window.location.origin}/playlists/${playlist.id}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: playlist.name, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      }
-    } catch {
-      await navigator.clipboard.writeText(url).catch(() => {});
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  );
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIdx = arrangements.findIndex((a) => a.id === active.id);
-    const newIdx = arrangements.findIndex((a) => a.id === over.id);
-    const reordered = arrayMove(arrangements, oldIdx, newIdx);
-
-    setArrangements(reordered);
-    await updateArrangementOrders(reordered.map((a, i) => ({ id: a.id, sortOrder: i })));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
-  };
-
-  const handleRemove = async (arrId: string) => {
-    setArrangements((prev) => prev.filter((a) => a.id !== arrId));
-    await removeArrangementFromPlaylist(arrId);
-    onRefetch();
-  };
-
-  const handleAddSong = async (song: MasterSong) => {
-    const version = song.versions.find((v) => v.isDefault) ?? song.versions[0];
-    if (!version) return;
-
-    const newId = await addSongToPlaylist({
-      playlistId: playlist.id,
-      masterSongId: song.id,
-      versionId: version.id,
-      sortOrder: arrangements.length,
-    });
-
-    if (newId) {
-      setArrangements((prev) => [
-        ...prev,
-        {
-          id: newId,
-          versionId: version.id,
-          masterSongId: song.id,
-          blockOrder: [],
-          customDirections: undefined,
-          transposedKey: undefined,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-    }
-    setShowAddSong(false);
-    onRefetch();
-  };
-
-  const serviceLabel = serviceTypeLabel(playlist.serviceType, 'da');
-
-  return (
-    <div className="min-h-screen">
-      <div className="px-5 py-3">
-        <button
-          onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm text-muted hover:text-accent transition-colors cursor-pointer"
-        >
-          ← Voltar às playlists
-        </button>
-      </div>
-
-      <div className="px-5 md:px-8 mb-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-xl bg-accent-subtle flex items-center justify-center shrink-0">
-              <CalendarDays className="w-7 h-7 text-accent" />
-            </div>
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">
-                {playlist.name}
-              </h1>
-              <p className="text-xs text-muted mt-0.5 capitalize">{formatDate(playlist.serviceDate)}</p>
-              <div className="flex items-center gap-3 mt-1">
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-accent bg-accent-subtle px-2 py-0.5 rounded-md">
-                  Culto {serviceLabel}
-                </span>
-                <span className="text-[11px] text-subtle">por {playlist.createdBy}</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleShare}
-              className="p-2 rounded-lg text-muted hover:text-accent hover:bg-accent/10 transition-all cursor-pointer"
-              aria-label="Compartilhar playlist"
-              title="Compartilhar link"
-            >
-              {copied ? <Check className="w-4 h-4 text-success" /> : <Share2 className="w-4 h-4" />}
-            </button>
-            {isLoggedIn && (
-              <button
-                onClick={() => onEditPlaylist(playlist)}
-                className="p-2 rounded-lg text-muted hover:text-accent hover:bg-accent/10 transition-all cursor-pointer"
-                aria-label="Editar playlist"
-              >
-                <Pencil className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="px-5 md:px-8 pb-12">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-subtle">
-              Ordem do Culto ({arrangements.length} música{arrangements.length !== 1 ? 's' : ''})
-            </p>
-            {saved && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-success animate-fade-in">
-                <Check className="w-3 h-3" /> Salvo
-              </span>
-            )}
-          </div>
-          {isLoggedIn && (
-            <button
-              onClick={() => setShowAddSong(true)}
-              className="flex items-center gap-1.5 text-xs text-accent font-semibold hover:text-accent/80 transition-colors cursor-pointer"
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              Adicionar
-            </button>
-          )}
-        </div>
-
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext
-            items={arrangements.map((a) => a.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div className="space-y-2">
-              {arrangements.map((arr, i) => (
-                <SortableItem
-                  key={arr.id}
-                  arrangement={arr}
-                  song={songs.find((s) => s.id === arr.masterSongId)}
-                  index={i}
-                  onRemove={() => handleRemove(arr.id)}
-                  canEdit={isLoggedIn}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-
-        {arrangements.length === 0 && (
-          <div className="text-center py-12">
-            <Music2 className="w-10 h-10 text-subtle mx-auto mb-3" />
-            <p className="text-sm text-muted">Nenhuma música na playlist.</p>
-            <button
-              onClick={() => setShowAddSong(true)}
-              className="mt-3 text-xs text-accent hover:underline cursor-pointer"
-            >
-              Adicionar músicas
-            </button>
-          </div>
-        )}
-      </div>
-
-      {showAddSong && (
-        <AddSongModal
-          songs={songs}
-          existingIds={arrangements.map((a) => a.masterSongId)}
-          onAdd={handleAddSong}
-          onClose={() => setShowAddSong(false)}
-        />
-      )}
-    </div>
-  );
-}
-
-// =============================================
-// Sortable item
-// =============================================
-
-function SortableItem({
-  arrangement,
-  song,
-  index,
-  onRemove,
-  canEdit = false,
-}: {
-  arrangement: WorshipArrangement;
-  song: MasterSong | undefined;
-  index: number;
-  onRemove: () => void;
-  canEdit?: boolean;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: arrangement.id,
-    disabled: !canEdit,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  const version = song?.versions.find((v) => v.isDefault) ?? song?.versions[0];
-  const displayKey = arrangement.transposedKey ?? version?.key ?? '—';
-  const artists = version?.artists.join(', ') ?? '';
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`flex items-center gap-3 bg-card border border-border rounded-xl p-3 transition-shadow ${
-        isDragging ? 'shadow-lg shadow-accent/10 border-accent/30 z-50' : ''
-      }`}
-    >
-      {canEdit ? (
-        <button
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing text-subtle hover:text-muted transition-colors touch-target"
-          aria-label="Arrastar para reordenar"
-        >
-          <GripVertical className="w-4 h-4" />
-        </button>
-      ) : (
-        <span className="w-9 shrink-0" />
-      )}
-
-      <span className="text-[11px] font-bold text-subtle w-4 shrink-0 text-center">{index + 1}</span>
-
-      <div className="flex-1 min-w-0">
-        {song ? (
-          <Link
-            href={`/musica/${song.id}`}
-            className="text-sm font-semibold text-foreground hover:text-accent transition-colors truncate block"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {song.title}
-          </Link>
-        ) : (
-          <p className="text-sm font-semibold text-subtle italic truncate">Música removida</p>
-        )}
-        {artists && <p className="text-[11px] text-muted truncate">{artists}</p>}
-      </div>
-
-      <span className="text-[10px] font-bold text-accent bg-accent-subtle px-2 py-1 rounded-md shrink-0">
-        {displayKey}
-      </span>
-
-      {canEdit && (
-        <button
-          onClick={onRemove}
-          className="p-1.5 text-subtle hover:text-danger transition-colors cursor-pointer shrink-0"
-          aria-label="Remover da playlist"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      )}
-    </div>
-  );
-}
-
-// =============================================
 // Create / Edit modal
 // =============================================
 
@@ -776,13 +464,28 @@ function PlaylistModal({
   const [serviceDate, setServiceDate] = useState(playlist?.serviceDate ?? '');
   // Playlist fixa: sem data de culto (ex.: repertório de músicas novas)
   const [noDate, setNoDate] = useState(playlist ? playlist.serviceDate === null : false);
+  // Playlist particular: só o dono vê — sempre fixa, sem data de culto
+  const [isPrivate, setIsPrivate] = useState(playlist?.isPrivate ?? false);
 
-  const isValid = name.trim() !== '' && (noDate || serviceDate !== '');
+  const isValid = isPrivate || noDate || serviceDate !== '';
+
+  const autoName = isPrivate
+    ? 'Playlist Particular'
+    : noDate
+      ? 'Repertório Fixo'
+      : serviceDate
+        ? autoPlaylistName(serviceDate, serviceType)
+        : '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValid) return;
-    await onSave({ name: name.trim(), serviceType, serviceDate: noDate ? null : serviceDate });
+    await onSave({
+      name: name.trim() || autoName,
+      serviceType,
+      serviceDate: isPrivate || noDate ? null : serviceDate,
+      isPrivate,
+    });
   };
 
   return (
@@ -808,58 +511,82 @@ function PlaylistModal({
         <div className="space-y-4">
           <div>
             <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">
-              Nome *
+              Nome (opcional)
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Culto Domingo 26/01"
+              placeholder={autoName || 'Ex: Culto Domingo 26/01'}
               className="w-full px-3 py-2.5 bg-elevated border border-border rounded-lg text-sm text-foreground placeholder:text-subtle focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all"
-              required
             />
+            {!name.trim() && autoName && (
+              <p className="text-[11px] text-subtle mt-1">Sem nome, vira &quot;{autoName}&quot;</p>
+            )}
           </div>
 
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">
-              Tipo de Culto *
-            </label>
-            <select
-              value={serviceType}
-              onChange={(e) => setServiceType(e.target.value as ServiceType)}
-              className="w-full px-3 py-2.5 bg-elevated border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent/50 transition-all cursor-pointer"
-            >
-              <option value="manha">Manhã</option>
-              <option value="noite">Noite</option>
-              <option value="especial">Especial</option>
-              <option value="estudo">Estudo Bíblico</option>
-            </select>
-          </div>
+          {!isPrivate && (
+            <>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">
+                  Tipo de Culto *
+                </label>
+                <select
+                  value={serviceType}
+                  onChange={(e) => setServiceType(e.target.value as ServiceType)}
+                  className="w-full px-3 py-2.5 bg-elevated border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent/50 transition-all cursor-pointer"
+                >
+                  <option value="manha">Manhã</option>
+                  <option value="noite">Noite</option>
+                  <option value="especial">Especial</option>
+                  <option value="estudo">Estudo Bíblico</option>
+                </select>
+              </div>
 
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">
-              Data {noDate ? '' : '*'}
-            </label>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">
+                  Data {noDate ? '' : '*'}
+                </label>
+                <input
+                  type="date"
+                  value={noDate ? '' : serviceDate}
+                  onChange={(e) => setServiceDate(e.target.value)}
+                  disabled={noDate}
+                  className="w-full px-3 py-2.5 bg-elevated border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent/50 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  required={!noDate}
+                />
+                <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={noDate}
+                    onChange={(e) => setNoDate(e.target.checked)}
+                    className="w-4 h-4 rounded border-border accent-[var(--accent)] cursor-pointer"
+                  />
+                  <span className="text-xs text-muted">
+                    Playlist fixa (sem data de culto) — fica sempre no topo, ex.: músicas novas
+                  </span>
+                </label>
+              </div>
+            </>
+          )}
+
+          <label className="flex items-start gap-2 cursor-pointer select-none p-3 rounded-lg bg-elevated border border-border">
             <input
-              type="date"
-              value={noDate ? '' : serviceDate}
-              onChange={(e) => setServiceDate(e.target.value)}
-              disabled={noDate}
-              className="w-full px-3 py-2.5 bg-elevated border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent/50 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              required={!noDate}
+              type="checkbox"
+              checked={isPrivate}
+              onChange={(e) => setIsPrivate(e.target.checked)}
+              className="w-4 h-4 mt-0.5 rounded border-border accent-[var(--accent)] cursor-pointer"
             />
-            <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={noDate}
-                onChange={(e) => setNoDate(e.target.checked)}
-                className="w-4 h-4 rounded border-border accent-[var(--accent)] cursor-pointer"
-              />
-              <span className="text-xs text-muted">
-                Playlist fixa (sem data de culto) — fica sempre no topo, ex.: músicas novas
+            <span className="flex-1">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <Lock className="w-3.5 h-3.5" />
+                Particular (só eu vejo)
               </span>
-            </label>
-          </div>
+              <span className="text-[11px] text-muted block mt-0.5">
+                Fica fora das listas de todo mundo — útil pra ensaiar músicas específicas sozinho.
+              </span>
+            </span>
+          </label>
         </div>
 
         <div className="flex gap-3 mt-6">
@@ -889,113 +616,19 @@ function PlaylistModal({
 }
 
 // =============================================
-// Add song modal
-// =============================================
-
-function AddSongModal({
-  songs,
-  existingIds,
-  onAdd,
-  onClose,
-}: {
-  songs: MasterSong[];
-  existingIds: string[];
-  onAdd: (song: MasterSong) => Promise<void>;
-  onClose: () => void;
-}) {
-  const [search, setSearch] = useState('');
-  const [adding, setAdding] = useState<string | null>(null);
-
-  const available = songs
-    .filter((s) => !existingIds.includes(s.id))
-    .map((s) => {
-      const rank = searchRank({ title: s.title, artists: s.versions.flatMap((v) => v.artists) }, search);
-      return rank === null ? null : { song: s, rank };
-    })
-    .filter((x): x is { song: MasterSong; rank: number } => x !== null)
-    .sort((a, b) => a.rank - b.rank || a.song.title.localeCompare(b.song.title))
-    .map((x) => x.song);
-
-  const handleAdd = async (song: MasterSong) => {
-    setAdding(song.id);
-    await onAdd(song);
-    setAdding(null);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl animate-slide-up flex flex-col max-h-[70vh]">
-        <div className="flex items-center justify-between p-5 border-b border-border">
-          <h2 className="text-lg font-bold text-foreground">Adicionar Música</h2>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-subtle hover:text-foreground cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-3 border-b border-border">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar música…"
-              className="w-full pl-9 pr-3 py-2 bg-elevated border border-border rounded-lg text-sm text-foreground placeholder:text-subtle focus:outline-none focus:border-accent/50 transition-all"
-              autoFocus
-            />
-          </div>
-        </div>
-
-        <div className="overflow-y-auto flex-1 p-3 space-y-1.5">
-          {available.length === 0 ? (
-            <p className="text-center text-sm text-muted py-8">Nenhuma música disponível.</p>
-          ) : (
-            available.map((song) => {
-              const version = song.versions.find((v) => v.isDefault) ?? song.versions[0];
-              return (
-                <button
-                  key={song.id}
-                  onClick={() => handleAdd(song)}
-                  disabled={adding === song.id}
-                  className="w-full flex items-center justify-between p-3 rounded-lg bg-elevated hover:bg-border transition-all cursor-pointer disabled:opacity-50 text-left"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{song.title}</p>
-                    {version && (
-                      <p className="text-[11px] text-muted truncate">
-                        {version.artists.join(', ')}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 ml-2 shrink-0">
-                    {version && (
-                      <span className="text-[10px] font-bold text-accent bg-accent-subtle px-2 py-0.5 rounded-md">
-                        {version.key}
-                      </span>
-                    )}
-                    {adding === song.id ? (
-                      <Loader2 className="w-4 h-4 text-accent animate-spin" />
-                    ) : (
-                      <Plus className="w-4 h-4 text-subtle" />
-                    )}
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// =============================================
 // Helpers
 // =============================================
+
+/** "Domingo Manhã · 20/04/2025" — usado quando o nome é deixado em branco. */
+function autoPlaylistName(serviceDate: string, serviceType: string): string {
+  // T12:00:00 local evita a data voltar um dia por causa do fuso horário.
+  const d = new Date(serviceDate + 'T12:00:00');
+  const weekday = d.toLocaleDateString('pt-BR', { weekday: 'long' });
+  const weekdayCap = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+  const formatted = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const typeLabel = serviceTypeLabel(serviceType);
+  return `${weekdayCap} ${typeLabel} · ${formatted}`;
+}
 
 function serviceTypeLabel(type: string, prefix?: string): string {
   const labels: Record<string, string> = {

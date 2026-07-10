@@ -187,6 +187,10 @@ export interface Playlist {
   serviceType: 'manha' | 'noite' | 'especial' | 'estudo';
   /** Date of service; null = playlist fixa, sem culto (ex.: repertório de músicas novas) */
   serviceDate: string | null; // ISO date
+  /** Se true, só o dono (ownerEmail) enxerga essa playlist — RLS bloqueia leitura anônima */
+  isPrivate: boolean;
+  /** E-mail do dono, quando isPrivate = true */
+  ownerEmail: string | null;
   /** Ordered list of arrangements */
   arrangements: WorshipArrangement[];
   /** Who created this playlist */
