@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { searchRank } from '@/lib/search';
 import { useRouter } from 'next/navigation';
 import { usePlaylists, useSongs } from '@/hooks/useData';
 import {
@@ -905,15 +906,15 @@ function AddSongModal({
   const [search, setSearch] = useState('');
   const [adding, setAdding] = useState<string | null>(null);
 
-  const available = songs.filter(
-    (s) =>
-      !existingIds.includes(s.id) &&
-      (search.trim() === '' ||
-        s.title.toLowerCase().includes(search.toLowerCase()) ||
-        s.versions.some((v) =>
-          v.artists.some((a) => a.toLowerCase().includes(search.toLowerCase()))
-        ))
-  );
+  const available = songs
+    .filter((s) => !existingIds.includes(s.id))
+    .map((s) => {
+      const rank = searchRank({ title: s.title, artists: s.versions.flatMap((v) => v.artists) }, search);
+      return rank === null ? null : { song: s, rank };
+    })
+    .filter((x): x is { song: MasterSong; rank: number } => x !== null)
+    .sort((a, b) => a.rank - b.rank || a.song.title.localeCompare(b.song.title))
+    .map((x) => x.song);
 
   const handleAdd = async (song: MasterSong) => {
     setAdding(song.id);

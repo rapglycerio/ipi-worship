@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSongs } from '@/hooks/useData';
+import { searchRank } from '@/lib/search';
 import SongCard from '@/components/SongCard';
 import {
   Search,
@@ -24,21 +25,22 @@ export default function BuscaPage() {
 
   const results = useMemo(() => {
     if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    return songs.filter((song) => {
-      const titleMatch = song.title?.toLowerCase().includes(q) || false;
-      const artistMatch = song.versions.some((v) =>
-        v.artists?.some((a) => a?.toLowerCase().includes(q))
-      );
-      // Search within lyrics
-      const lyricsMatch = song.versions.some((v) =>
-        v.blocks?.some((b) =>
-          b.lines?.some((l) => l.lyrics?.toLowerCase().includes(q))
-        )
-      );
-      const composerMatch = song.originalComposer?.toLowerCase().includes(q) || false;
-      return titleMatch || artistMatch || lyricsMatch || composerMatch;
-    });
+    return songs
+      .map((song) => {
+        const rank = searchRank(
+          {
+            title: song.title,
+            artists: song.versions.flatMap((v) => v.artists ?? []),
+            composer: song.originalComposer,
+            lyrics: song.versions.flatMap((v) => v.blocks?.flatMap((b) => b.lines?.map((l) => l.lyrics)) ?? []),
+          },
+          query
+        );
+        return rank === null ? null : { song, rank };
+      })
+      .filter((x): x is { song: typeof songs[number]; rank: number } => x !== null)
+      .sort((a, b) => a.rank - b.rank || a.song.title.localeCompare(b.song.title))
+      .map((x) => x.song);
   }, [query, songs]);
 
   const showSuggestions = !query.trim();
