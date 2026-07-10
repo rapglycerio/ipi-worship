@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useSongs, usePlaylists } from '@/hooks/useData';
-import { normalizeSearch } from '@/lib/search';
+import { searchRank } from '@/lib/search';
 import { liturgicalTagLabels } from '@/data/mock-songs';
 import SongCard from '@/components/SongCard';
 import type { LiturgicalTag, SongNature } from '@/types';
@@ -36,34 +36,32 @@ export default function MusicasPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   const filteredSongs = useMemo(() => {
-    return songs.filter((song) => {
-      // Text search (title, artists, lyrics)
-      if (searchQuery.trim()) {
-        const q = normalizeSearch(searchQuery);
-        const titleMatch = normalizeSearch(song.title).includes(q);
-        const artistMatch = song.versions.some((v) =>
-          v.artists?.some((a) => normalizeSearch(a).includes(q))
-        );
-        const lyricsMatch = song.versions.some((v) =>
-          v.blocks?.some((b) =>
-            b.lines?.some((l) => normalizeSearch(l.lyrics).includes(q))
-          )
-        );
-        if (!titleMatch && !artistMatch && !lyricsMatch) return false;
-      }
-
-      // Nature filter
+    const base = songs.filter((song) => {
       if (selectedNature !== 'all' && song.nature !== selectedNature) return false;
-
-      // Tag filter
       if (selectedTag && !song.liturgicalTags.includes(selectedTag)) return false;
-
-      // Adjusted filter
       if (selectedAdjusted === 'adjusted' && !song.isAdjusted) return false;
       if (selectedAdjusted === 'pending' && song.isAdjusted) return false;
-
       return true;
     });
+
+    if (!searchQuery.trim()) return base;
+
+    // Com busca ativa, ordena por relevância: título > artista > letra
+    return base
+      .map((song) => {
+        const rank = searchRank(
+          {
+            title: song.title,
+            artists: song.versions.flatMap((v) => v.artists ?? []),
+            lyrics: song.versions.flatMap((v) => v.blocks?.flatMap((b) => b.lines?.map((l) => l.lyrics)) ?? []),
+          },
+          searchQuery
+        );
+        return rank === null ? null : { song, rank };
+      })
+      .filter((x): x is { song: typeof songs[number]; rank: number } => x !== null)
+      .sort((a, b) => a.rank - b.rank || a.song.title.localeCompare(b.song.title))
+      .map((x) => x.song);
   }, [songs, searchQuery, selectedNature, selectedTag, selectedAdjusted]);
 
   const approvedCount = songs.filter((s) => s.analysis?.status === 'approved').length;
