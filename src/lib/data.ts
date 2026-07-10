@@ -228,6 +228,8 @@ export async function createPlaylist(data: {
   name: string;
   serviceType: string;
   serviceDate: string | null;
+  isPrivate?: boolean;
+  ownerEmail?: string | null;
 }): Promise<string | null> {
   const { data: result, error } = await supabase
     .from('playlists')
@@ -235,6 +237,8 @@ export async function createPlaylist(data: {
       name: data.name,
       service_type: data.serviceType,
       service_date: data.serviceDate,
+      is_private: data.isPrivate ?? false,
+      owner_email: data.isPrivate ? (data.ownerEmail ?? null) : null,
       // created_by é UUID FK para auth.users — deixamos null (NextAuth não usa Supabase Auth)
     })
     .select('id')
@@ -249,12 +253,20 @@ export async function createPlaylist(data: {
 
 export async function updatePlaylist(
   id: string,
-  data: { name?: string; serviceType?: string; serviceDate?: string | null }
+  data: {
+    name?: string;
+    serviceType?: string;
+    serviceDate?: string | null;
+    isPrivate?: boolean;
+    ownerEmail?: string | null;
+  }
 ): Promise<boolean> {
-  const patch: Record<string, string | null> = {};
+  const patch: Record<string, string | boolean | null> = {};
   if (data.name !== undefined) patch.name = data.name;
   if (data.serviceType !== undefined) patch.service_type = data.serviceType;
   if (data.serviceDate !== undefined) patch.service_date = data.serviceDate;
+  if (data.isPrivate !== undefined) patch.is_private = data.isPrivate;
+  if (data.ownerEmail !== undefined) patch.owner_email = data.ownerEmail;
 
   const { error } = await supabase.from('playlists').update(patch).eq('id', id);
   if (error) {
@@ -262,6 +274,22 @@ export async function updatePlaylist(
     return false;
   }
   return true;
+}
+
+/**
+ * Playlists particulares do usuário logado. A leitura anônima (RLS) não
+ * enxerga is_private=true, então isso passa pela rota server-side que
+ * confere a sessão e usa o service_role.
+ */
+export async function fetchPrivatePlaylists(): Promise<Playlist[]> {
+  try {
+    const res = await fetch('/api/playlists/private');
+    if (!res.ok) return [];
+    const json = await res.json();
+    return ((json.playlists as unknown[]) || []).map(mapDbPlaylistToPlaylist);
+  } catch {
+    return [];
+  }
 }
 
 export async function deletePlaylist(id: string): Promise<boolean> {
@@ -616,6 +644,8 @@ function mapDbPlaylistToPlaylist(row: any): Playlist {
     name: row.name,
     serviceType: row.service_type,
     serviceDate: row.service_date,
+    isPrivate: row.is_private ?? false,
+    ownerEmail: row.owner_email ?? null,
     arrangements: (row.worship_arrangements || [])
       .sort((a: any, b: any) => a.sort_order - b.sort_order)
       .map((a: any): WorshipArrangement => ({

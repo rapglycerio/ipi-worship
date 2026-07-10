@@ -78,6 +78,8 @@ CREATE TABLE IF NOT EXISTS playlists (
   service_type TEXT        NOT NULL DEFAULT 'manha'
                            CHECK (service_type IN ('manha','noite','especial','estudo')),
   service_date DATE, -- null = playlist fixa, sem culto (nullable desde 2026-07-09)
+  is_private   BOOLEAN     NOT NULL DEFAULT false, -- só owner_email enxerga (RLS, desde 2026-07-10)
+  owner_email  TEXT, -- dono, quando is_private = true
   created_by   TEXT        DEFAULT 'Sistema',
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()

@@ -253,6 +253,8 @@ export const mockPlaylist: Playlist = {
   name: 'Domingo Manhã - 20/04/2025',
   serviceType: 'manha',
   serviceDate: '2025-04-20',
+  isPrivate: false,
+  ownerEmail: null,
   arrangements: [
     {
       id: 'arr-1',
