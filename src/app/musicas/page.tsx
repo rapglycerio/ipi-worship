@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useSongs, usePlaylists } from '@/hooks/useData';
+import { normalizeSearch } from '@/lib/search';
 import { liturgicalTagLabels } from '@/data/mock-songs';
 import SongCard from '@/components/SongCard';
 import type { LiturgicalTag, SongNature } from '@/types';
@@ -38,14 +39,14 @@ export default function MusicasPage() {
     return songs.filter((song) => {
       // Text search (title, artists, lyrics)
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const titleMatch = song.title?.toLowerCase().includes(q) || false;
+        const q = normalizeSearch(searchQuery);
+        const titleMatch = normalizeSearch(song.title).includes(q);
         const artistMatch = song.versions.some((v) =>
-          v.artists?.some((a) => a?.toLowerCase().includes(q))
+          v.artists?.some((a) => normalizeSearch(a).includes(q))
         );
         const lyricsMatch = song.versions.some((v) =>
           v.blocks?.some((b) =>
-            b.lines?.some((l) => l.lyrics?.toLowerCase().includes(q))
+            b.lines?.some((l) => normalizeSearch(l.lyrics).includes(q))
           )
         );
         if (!titleMatch && !artistMatch && !lyricsMatch) return false;

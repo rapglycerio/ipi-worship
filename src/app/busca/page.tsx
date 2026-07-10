@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSongs } from '@/hooks/useData';
+import { normalizeSearch } from '@/lib/search';
 import SongCard from '@/components/SongCard';
 import {
   Search,
@@ -24,19 +25,19 @@ export default function BuscaPage() {
 
   const results = useMemo(() => {
     if (!query.trim()) return [];
-    const q = query.toLowerCase();
+    const q = normalizeSearch(query);
     return songs.filter((song) => {
-      const titleMatch = song.title?.toLowerCase().includes(q) || false;
+      const titleMatch = normalizeSearch(song.title).includes(q);
       const artistMatch = song.versions.some((v) =>
-        v.artists?.some((a) => a?.toLowerCase().includes(q))
+        v.artists?.some((a) => normalizeSearch(a).includes(q))
       );
       // Search within lyrics
       const lyricsMatch = song.versions.some((v) =>
         v.blocks?.some((b) =>
-          b.lines?.some((l) => l.lyrics?.toLowerCase().includes(q))
+          b.lines?.some((l) => normalizeSearch(l.lyrics).includes(q))
         )
       );
-      const composerMatch = song.originalComposer?.toLowerCase().includes(q) || false;
+      const composerMatch = normalizeSearch(song.originalComposer).includes(q);
       return titleMatch || artistMatch || lyricsMatch || composerMatch;
     });
   }, [query, songs]);

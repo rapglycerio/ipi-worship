@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { normalizeSearch } from '@/lib/search';
 import { useRouter } from 'next/navigation';
 import { usePlaylists, useSongs } from '@/hooks/useData';
 import {
@@ -905,15 +906,15 @@ function AddSongModal({
   const [search, setSearch] = useState('');
   const [adding, setAdding] = useState<string | null>(null);
 
-  const available = songs.filter(
-    (s) =>
-      !existingIds.includes(s.id) &&
-      (search.trim() === '' ||
-        s.title.toLowerCase().includes(search.toLowerCase()) ||
-        s.versions.some((v) =>
-          v.artists.some((a) => a.toLowerCase().includes(search.toLowerCase()))
-        ))
-  );
+  const available = songs.filter((s) => {
+    if (existingIds.includes(s.id)) return false;
+    const q = normalizeSearch(search);
+    if (!q) return true;
+    return (
+      normalizeSearch(s.title).includes(q) ||
+      s.versions.some((v) => v.artists.some((a) => normalizeSearch(a).includes(q)))
+    );
+  });
 
   const handleAdd = async (song: MasterSong) => {
     setAdding(song.id);
