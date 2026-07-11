@@ -1,6 +1,6 @@
 'use client';
 
-import type { MasterSong, ApprovalStatus } from '@/types';
+import type { MasterSong } from '@/types';
 import { getDefaultVersion, liturgicalTagLabels } from '@/data/mock-songs';
 import Link from 'next/link';
 import {
@@ -8,9 +8,8 @@ import {
   Clock,
   Tag,
   ChevronRight,
-  ShieldCheck,
-  ShieldAlert,
-  ShieldQuestion,
+  CheckCircle2,
+  Circle,
   Users,
 } from 'lucide-react';
 
@@ -24,12 +23,6 @@ interface SongCardProps {
   overrideKey?: string;
 }
 
-const approvalConfig: Record<ApprovalStatus, { badge: string; icon: typeof ShieldCheck; label: string }> = {
-  approved: { badge: 'badge-approved', icon: ShieldCheck, label: 'Aprovado' },
-  rejected: { badge: 'badge-rejected', icon: ShieldAlert, label: 'Rejeitado' },
-  pending: { badge: 'badge-pending', icon: ShieldQuestion, label: 'Pendente' },
-};
-
 export default function SongCard({ song, compact = false, index, playlistId, overrideKey }: SongCardProps) {
   const defaultVersion = getDefaultVersion(song);
   if (!defaultVersion) return null;
@@ -37,10 +30,12 @@ export default function SongCard({ song, compact = false, index, playlistId, ove
   const href = playlistId ? `/musica/${song.id}?pl=${playlistId}` : `/musica/${song.id}`;
   const displayKey = overrideKey || defaultVersion.key;
 
-  const approval = song.analysis
-    ? approvalConfig[song.analysis.status]
-    : approvalConfig.pending;
-  const ApprovalIcon = approval.icon;
+  // Situação da cifra (ajustada/pendente) é mais útil aqui do que o parecer
+  // teológico, que ainda não foi avaliado pra praticamente nenhuma música.
+  const adjusted = song.isAdjusted
+    ? { badge: 'badge-approved', icon: CheckCircle2, label: 'Ajustada' }
+    : { badge: 'badge-pending', icon: Circle, label: 'Pendente' };
+  const AdjustedIcon = adjusted.icon;
 
   return (
     <Link
@@ -86,10 +81,10 @@ export default function SongCard({ song, compact = false, index, playlistId, ove
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              {/* Approval Badge */}
-              <span className={approval.badge}>
-                <ApprovalIcon className="w-3 h-3" />
-                {!compact && approval.label}
+              {/* Adjusted (cifra) Badge */}
+              <span className={adjusted.badge} title="Situação da cifra">
+                <AdjustedIcon className="w-3 h-3" />
+                {!compact && adjusted.label}
               </span>
               <ChevronRight className="w-4 h-4 text-subtle group-hover:text-accent transition-colors" />
             </div>

@@ -69,3 +69,13 @@ export async function getPrivatePlaylistsForOwner(email: string): Promise<unknow
   if (error) { console.error('getPrivatePlaylistsForOwner:', error); return []; }
   return data ?? [];
 }
+
+/** app_users é só-leitura pra anon — salvar a preferência exige service_role. */
+export async function setViewModePreference(email: string, viewMode: string): Promise<boolean> {
+  const { error } = await supabaseAdmin
+    .from('app_users')
+    .update({ preferred_view_mode: viewMode })
+    .eq('email', email);
+  if (error) { console.error('setViewModePreference:', error); return false; }
+  return true;
+}

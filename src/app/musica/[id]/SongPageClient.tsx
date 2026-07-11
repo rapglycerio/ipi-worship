@@ -763,7 +763,9 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
 
 
   const [song, setSong] = useState<MasterSong | null | undefined>(undefined);
-  const [viewMode, setViewMode] = useState<ViewMode>('chords_and_lyrics');
+  // Anônimo sempre começa só na letra; quem está logado recebe a preferência
+  // salva na conta (ou cifra+letra, se nunca escolheu nada) assim que carrega.
+  const [viewMode, setViewMode] = useState<ViewMode>('lyrics_only');
   const [fontSize, setFontSize] = useState<FontSizePreset>('md');
   const [transposeSemitones, setTransposeSemitones] = useState(0);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
@@ -806,10 +808,24 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
     if (prefsLoaded.current) return;
     prefsLoaded.current = true;
     const savedSize = localStorage.getItem('worship_fontSize') as FontSizePreset | null;
-    const savedMode = localStorage.getItem('worship_viewMode') as ViewMode | null;
     if (savedSize && ['sm', 'md', 'lg', 'xl', '2xl'].includes(savedSize)) setFontSize(savedSize);
-    if (savedMode && ['chords_and_lyrics', 'lyrics_only'].includes(savedMode)) setViewMode(savedMode);
   }, []);
+
+  // Usuário logado: aplica a preferência de visualização salva na conta
+  // (cifra+letra por padrão se ele nunca escolheu nada explicitamente).
+  useEffect(() => {
+    const email = session?.user?.email;
+    if (!email) return;
+    let cancelled = false;
+    (async () => {
+      const { fetchUserViewModePreference } = await import('@/lib/data');
+      const saved = await fetchUserViewModePreference(email);
+      if (!cancelled) setViewMode(saved ?? 'chords_and_lyrics');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.email]);
 
   // Load last played date from playlists
   useEffect(() => {
@@ -911,7 +927,11 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
-    localStorage.setItem('worship_viewMode', mode);
+    // Só persiste pra quem está logado — anônimo sempre volta a "só letra"
+    // na próxima visita.
+    if (session?.user?.email) {
+      import('@/lib/data').then(({ saveUserViewModePreference }) => saveUserViewModePreference(mode));
+    }
   };
 
   const handleDeleteSong = async () => {
