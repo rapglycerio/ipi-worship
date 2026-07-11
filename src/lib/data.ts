@@ -16,6 +16,7 @@ import type {
   LiturgicalTag,
   ChordLine,
   StageDirectionItem,
+  ViewMode,
 } from '@/types';
 
 /** POST JSON to a server route that authorizes the action; returns its `ok`. */
@@ -581,6 +582,22 @@ export async function setUserAdmin(userId: string, admin: boolean): Promise<bool
   // Admin-only, enforced server-side (RLS denies anon writes to app_users, so
   // nobody can self-promote by calling Supabase directly).
   return postOk('/api/admin/set-role', { userId, admin });
+}
+
+/** Preferência salva (cifra+letra / só letra) do usuário logado, se houver. */
+export async function fetchUserViewModePreference(email: string): Promise<ViewMode | null> {
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('preferred_view_mode')
+    .eq('email', email)
+    .single();
+  if (error || !data?.preferred_view_mode) return null;
+  return data.preferred_view_mode as ViewMode;
+}
+
+export async function saveUserViewModePreference(viewMode: ViewMode): Promise<boolean> {
+  // app_users é read-only pra anon — a escrita passa pela rota autenticada.
+  return postOk('/api/user/view-mode', { viewMode });
 }
 
 // NOTE: getUserRole / upsertAppUser moved to src/lib/data-admin.ts — they run

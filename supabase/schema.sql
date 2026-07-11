@@ -105,6 +105,8 @@ CREATE TABLE IF NOT EXISTS app_users (
   photo_url    TEXT,
   role         TEXT        NOT NULL DEFAULT 'visitor'
                            CHECK (role IN ('visitor','member','admin')),
+  preferred_view_mode TEXT -- cifra+letra ou só letra (desde 2026-07-11)
+                           CHECK (preferred_view_mode IN ('chords_and_lyrics','lyrics_only')),
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_seen    TIMESTAMPTZ
 );
