@@ -7,11 +7,13 @@
  * Strategies:
  *   • Navigations (HTML)      → network-first, fall back to cached page, then app shell.
  *   • Static assets (_next…)  → stale-while-revalidate.
- *   • Supabase GET (data)     → stale-while-revalidate, so already-visited
- *                               songs/playlists still load offline.
+ *   • Supabase GET (data)     → network-first, so a playlist/song created or
+ *                               edited shows up immediately instead of the
+ *                               previous cached snapshot; falls back to cache
+ *                               only when actually offline.
  *   • Everything non-GET      → passes straight through (never cached).
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL_CACHE = `ipi-shell-${VERSION}`;
 const ASSET_CACHE = `ipi-assets-${VERSION}`;
 const DATA_CACHE = `ipi-data-${VERSION}`;
@@ -63,15 +65,30 @@ function staleWhileRevalidate(request, cacheName) {
   );
 }
 
+// Sempre tenta a rede primeiro — evita servir uma lista/playlist desatualizada
+// logo após o próprio app criar ou editar algo. Só cai pro cache se estiver
+// offline de fato.
+function networkFirst(request, cacheName) {
+  return caches.open(cacheName).then((cache) =>
+    fetch(request)
+      .then((response) => {
+        if (response && response.ok) cache.put(request, response.clone());
+        return response;
+      })
+      .catch(() => cache.match(request))
+  );
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return; // never cache writes/auth
 
   const url = new URL(request.url);
 
-  // Supabase data reads → stale-while-revalidate (offline access to visited songs).
+  // Supabase data reads → network-first (fresh data when online; cached
+  // snapshot of already-visited songs/playlists when offline).
   if (isSupabaseData(url)) {
-    event.respondWith(staleWhileRevalidate(request, DATA_CACHE));
+    event.respondWith(networkFirst(request, DATA_CACHE));
     return;
   }
 

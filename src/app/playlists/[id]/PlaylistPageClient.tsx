@@ -217,7 +217,8 @@ export default function SinglePlaylistPage() {
         },
       ]);
     }
-    setShowAddSong(false);
+    // Modal fica aberto de propósito — permite adicionar várias músicas
+    // seguidas sem precisar reabrir. O usuário fecha manualmente quando terminar.
     refetch();
   };
 
