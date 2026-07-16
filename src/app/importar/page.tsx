@@ -2,8 +2,8 @@
 
 import { useState, useCallback } from 'react';
 import { parseCifra } from '@/lib/cifra-parser';
-import BlockEditor, { newBlockId, newEmptyBlock } from '@/components/BlockEditor';
-import type { ChordBlock, SongNature, LiturgicalTag } from '@/types';
+import BlockEditor, { newBlockId, newEmptyBlock, BLOCK_TYPE_OPTIONS } from '@/components/BlockEditor';
+import type { ChordBlock, SongNature, LiturgicalTag, BlockType } from '@/types';
 import {
   Upload,
   FileText,
@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   Link as LinkIcon,
   Tag,
+  ChevronUp,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -30,12 +32,13 @@ const LITURGICAL_OPTIONS: { value: LiturgicalTag; label: string }[] = [
   { value: 'apelo', label: 'Apelo' },
 ];
 
-type ImportStep = 'input' | 'edit' | 'metadata' | 'saved';
+type ImportStep = 'input' | 'review' | 'edit' | 'metadata' | 'saved';
 
-const STEPS: ImportStep[] = ['input', 'edit', 'metadata', 'saved'];
+const STEPS: ImportStep[] = ['input', 'review', 'edit', 'metadata', 'saved'];
 const STEP_LABELS: Record<ImportStep, string> = {
   input: 'Cole o texto da cifra',
-  edit: 'Edite e reordene os blocos',
+  review: 'Confira a divisão dos blocos',
+  edit: 'Edite letra e acordes',
   metadata: 'Preencha os metadados',
   saved: 'Cifra salva com sucesso!',
 };
@@ -97,8 +100,36 @@ export default function ImportarPage() {
     if (rawTitle) setTitle(rawTitle);
     if (rawArtist) setArtists(rawArtist);
     if (detectedKey) setKey(detectedKey);
-    setStep('edit');
+    setStep('review');
   }, [rawText]);
+
+  const handleReviewTypeChange = (idx: number, type: BlockType) => {
+    setEditBlocks((prev) =>
+      prev.map((b, i) =>
+        i === idx ? { ...b, type, label: BLOCK_TYPE_OPTIONS.find((o) => o.value === type)?.label ?? b.label } : b
+      )
+    );
+  };
+
+  const handleMergeUp = (idx: number) => {
+    if (idx <= 0) return;
+    setEditBlocks((prev) => {
+      const prevBlock = prev[idx - 1];
+      const block = prev[idx];
+      const merged: ChordBlock = {
+        ...prevBlock,
+        lines: [...prevBlock.lines, ...block.lines],
+        directions: [...prevBlock.directions, ...block.directions],
+      };
+      const next = [...prev];
+      next.splice(idx - 1, 2, merged);
+      return next;
+    });
+  };
+
+  const handleDeleteReviewBlock = (idx: number) => {
+    setEditBlocks((prev) => prev.filter((_, i) => i !== idx));
+  };
 
   const handleSave = async () => {
     if (!title.trim() || saving || editBlocks.length === 0) return;
@@ -145,6 +176,7 @@ export default function ImportarPage() {
           },
         ],
         isAdjusted: false,
+        isArchived: false,
         searchableLyrics,
       });
 
@@ -260,10 +292,66 @@ export default function ImportarPage() {
           </div>
         )}
 
-        {/* ── Step 2: Block Editor ── */}
-        {step === 'edit' && (
+        {/* ── Step 2: Review blocks ── */}
+        {step === 'review' && (
           <div className="space-y-4 animate-fade-in">
-            <BlockEditor blocks={editBlocks} onChange={setEditBlocks} />
+            <div className="bg-card border border-border rounded-xl p-4">
+              <p className="text-sm text-foreground font-semibold mb-1">
+                Detectamos {editBlocks.length} bloco{editBlocks.length !== 1 ? 's' : ''}.
+              </p>
+              <p className="text-xs text-muted">
+                Confira o tipo de cada bloco e junte os que ficaram divididos sem necessidade.
+                Pra editar letra e acordes linha a linha, siga pra próxima etapa.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              {editBlocks.map((block, i) => (
+                <div key={block.id} className="bg-card border border-border rounded-xl p-3">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <select
+                      value={block.type}
+                      onChange={(e) => handleReviewTypeChange(i, e.target.value as BlockType)}
+                      className="text-xs font-bold uppercase tracking-wider text-accent bg-elevated border border-border rounded-lg px-2 py-1 focus:outline-none focus:border-accent/50 cursor-pointer"
+                    >
+                      {BLOCK_TYPE_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                    <span className="text-[10px] text-subtle">
+                      {block.lines.length} linha{block.lines.length !== 1 ? 's' : ''}
+                    </span>
+                    <div className="ml-auto flex items-center gap-1">
+                      {i > 0 && (
+                        <button
+                          onClick={() => handleMergeUp(i)}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium text-muted hover:bg-elevated cursor-pointer"
+                          title="Juntar com o bloco anterior"
+                        >
+                          <ChevronUp className="w-3 h-3" />
+                          Juntar acima
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDeleteReviewBlock(i)}
+                        className="p-1 text-subtle hover:text-danger cursor-pointer"
+                        title="Excluir bloco"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted truncate">
+                    {block.lines.map((l) => l.lyrics).filter(Boolean).join(' · ') || '(sem letra)'}
+                  </p>
+                </div>
+              ))}
+              {editBlocks.length === 0 && (
+                <p className="text-sm text-muted text-center py-6">
+                  Nenhum bloco detectado. Volte e revise o texto colado.
+                </p>
+              )}
+            </div>
 
             <div className="flex gap-3 pt-2">
               <button
@@ -271,6 +359,29 @@ export default function ImportarPage() {
                 className="flex-1 py-3 rounded-xl bg-elevated text-foreground font-semibold text-sm hover:bg-border transition-all cursor-pointer"
               >
                 ← Editar Texto
+              </button>
+              <button
+                onClick={() => setStep('edit')}
+                disabled={editBlocks.length === 0}
+                className="flex-1 py-3 rounded-xl bg-accent text-white font-semibold text-sm hover:bg-accent/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+              >
+                Editar Letra e Acordes →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 3: Block Editor ── */}
+        {step === 'edit' && (
+          <div className="space-y-4 animate-fade-in">
+            <BlockEditor blocks={editBlocks} onChange={setEditBlocks} />
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setStep('review')}
+                className="flex-1 py-3 rounded-xl bg-elevated text-foreground font-semibold text-sm hover:bg-border transition-all cursor-pointer"
+              >
+                ← Voltar
               </button>
               <button
                 onClick={() => setStep('metadata')}
