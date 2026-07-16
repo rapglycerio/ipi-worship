@@ -19,6 +19,7 @@ import {
   Users,
   CheckCircle2,
   Circle,
+  Archive,
 } from 'lucide-react';
 
 const allTags: LiturgicalTag[] = [
@@ -34,9 +35,14 @@ export default function MusicasPage() {
   const [selectedTag, setSelectedTag] = useState<LiturgicalTag | null>(null);
   const [selectedAdjusted, setSelectedAdjusted] = useState<'all' | 'adjusted' | 'pending'>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
+
+  const activeSongs = useMemo(() => songs.filter((s) => !s.isArchived), [songs]);
+  const archivedSongs = useMemo(() => songs.filter((s) => s.isArchived), [songs]);
+  const tabSongs = activeTab === 'archived' ? archivedSongs : activeSongs;
 
   const filteredSongs = useMemo(() => {
-    const base = songs.filter((song) => {
+    const base = tabSongs.filter((song) => {
       if (selectedNature !== 'all' && song.nature !== selectedNature) return false;
       if (selectedTag && !song.liturgicalTags.includes(selectedTag)) return false;
       if (selectedAdjusted === 'adjusted' && !song.isAdjusted) return false;
@@ -62,7 +68,7 @@ export default function MusicasPage() {
       .filter((x): x is { song: typeof songs[number]; rank: number } => x !== null)
       .sort((a, b) => a.rank - b.rank || a.song.title.localeCompare(b.song.title))
       .map((x) => x.song);
-  }, [songs, searchQuery, selectedNature, selectedTag, selectedAdjusted]);
+  }, [tabSongs, searchQuery, selectedNature, selectedTag, selectedAdjusted]);
 
   const approvedCount = songs.filter((s) => s.analysis?.status === 'approved').length;
   const pendingCount = songs.filter((s) => !s.analysis || s.analysis.status === 'pending').length;
@@ -88,6 +94,30 @@ export default function MusicasPage() {
             <h1 className="text-xl font-bold text-foreground tracking-tight">Todas as Músicas</h1>
             <p className="text-xs text-muted">{songs.length} músicas no acervo</p>
           </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={() => setActiveTab('active')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+              activeTab === 'active' ? 'bg-accent text-white' : 'bg-elevated text-muted hover:bg-border'
+            }`}
+          >
+            <Library className="w-3.5 h-3.5" />
+            Ativas
+            <span className={activeTab === 'active' ? 'opacity-80' : 'text-subtle'}>({activeSongs.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('archived')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+              activeTab === 'archived' ? 'bg-accent text-white' : 'bg-elevated text-muted hover:bg-border'
+            }`}
+          >
+            <Archive className="w-3.5 h-3.5" />
+            Arquivadas
+            <span className={activeTab === 'archived' ? 'opacity-80' : 'text-subtle'}>({archivedSongs.length})</span>
+          </button>
         </div>
 
         {/* Stats */}
@@ -262,7 +292,9 @@ export default function MusicasPage() {
         {filteredSongs.length === 0 ? (
           <div className="text-center py-12">
             <Music2 className="w-10 h-10 text-subtle mx-auto mb-3" />
-            <p className="text-sm text-muted">Nenhuma música encontrada.</p>
+            <p className="text-sm text-muted">
+              {activeTab === 'archived' ? 'Nenhuma música arquivada.' : 'Nenhuma música encontrada.'}
+            </p>
             <button
               onClick={() => { setSearchQuery(''); setSelectedNature('all'); setSelectedTag(null); }}
               className="text-xs text-accent hover:underline mt-2 cursor-pointer"

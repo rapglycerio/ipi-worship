@@ -321,6 +321,10 @@ export async function addSongToPlaylist(data: {
     console.error('Error adding song to playlist:', error);
     return null;
   }
+
+  // Entrar numa playlist tira a música do arquivamento automaticamente.
+  await supabase.from('master_songs').update({ is_archived: false }).eq('id', data.masterSongId);
+
   return result.id;
 }
 
@@ -377,6 +381,7 @@ export async function updateSongMetadata(
     nature?: string;
     liturgicalTags?: LiturgicalTag[];
     isAdjusted?: boolean;
+    isArchived?: boolean;
   }
 ): Promise<boolean> {
   const patch: Record<string, string | boolean | null> = {};
@@ -384,6 +389,7 @@ export async function updateSongMetadata(
   if (data.originalComposer !== undefined) patch.original_composer = data.originalComposer || null;
   if (data.nature !== undefined) patch.nature = data.nature;
   if (data.isAdjusted !== undefined) patch.is_adjusted = data.isAdjusted;
+  if (data.isArchived !== undefined) patch.is_archived = data.isArchived;
 
   if (Object.keys(patch).length > 0) {
     const { error } = await supabase.from('master_songs').update(patch).eq('id', id);
@@ -649,6 +655,7 @@ function mapDbSongToMasterSong(row: any): MasterSong {
       : undefined,
     versions,
     isAdjusted: row.is_adjusted ?? false,
+    isArchived: row.is_archived ?? false,
     searchableLyrics: row.searchable_lyrics || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

@@ -40,6 +40,8 @@ import {
   Pause,
   Gauge,
   Lock,
+  Archive,
+  ArchiveRestore,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -971,6 +973,14 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
     }
   };
 
+  const handleToggleArchived = async () => {
+    if (!song) return;
+    const { updateSongMetadata } = await import('@/lib/data');
+    const ok = await updateSongMetadata(song.id, { isArchived: !song.isArchived });
+    if (ok) loadSong();
+    else alert('Erro ao arquivar. Tente novamente.');
+  };
+
   const handleOpenEditBlocks = () => {
     setEditBlocks(activeVersion.blocks.map((b) => ({ ...b })));
     setMarkAsAdjusted(song?.isAdjusted ?? false);
@@ -1215,6 +1225,12 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
                   Tocada em {new Date(lastPlayedDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
               )}
+              {song.isArchived && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-subtle bg-elevated px-2 py-0.5 rounded-md">
+                  <Archive className="w-2.5 h-2.5" />
+                  Arquivada
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -1272,6 +1288,14 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
                 >
                   <LayoutList className="w-3.5 h-3.5" />
                   Editar Cifra
+                </button>
+                <button
+                  onClick={handleToggleArchived}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-elevated text-muted text-xs font-semibold hover:bg-border transition-all cursor-pointer"
+                  title={song.isArchived ? 'Desarquivar' : 'Arquivar'}
+                >
+                  {song.isArchived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+                  {song.isArchived ? 'Desarquivar' : 'Arquivar'}
                 </button>
                 <button
                   onClick={() => setShowDeleteConfirm(true)}

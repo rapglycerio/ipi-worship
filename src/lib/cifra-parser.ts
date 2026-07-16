@@ -177,15 +177,11 @@ export function parseCifra(rawText: string): ParseResult {
     const line = lines[i];
     const trimmed = line.trim();
 
-    // Skip empty lines (potential block separator)
+    // Empty lines always separate blocks — most pasted cifras mark stanza
+    // breaks this way even without [Marcadores] explícitos.
     if (!trimmed) {
-      // If we have a current block with content, an empty line can separate blocks
       if (currentBlock && currentBlock.lines.length > 0) {
-        // Peek ahead: if next non-empty line is a header, finalize
-        const nextNonEmpty = lines.slice(i + 1).find(l => l.trim());
-        if (!nextNonEmpty || BLOCK_HEADER_REGEX.test(nextNonEmpty)) {
-          finalizeBlock();
-        }
+        finalizeBlock();
       }
       continue;
     }
@@ -266,11 +262,49 @@ export function parseCifra(rawText: string): ParseResult {
   finalizeBlock();
 
   // Post-processing: if no blocks were detected by headers, try to auto-segment
-  if (blocks.length === 1 && blocks[0].lines.length > 12) {
-    return { blocks: autoSegmentBlocks(blocks[0].lines), detectedKey, rawTitle, rawArtist };
-  }
+  const finalBlocks = blocks.length === 1 && blocks[0].lines.length > 12
+    ? autoSegmentBlocks(blocks[0].lines)
+    : blocks;
 
-  return { blocks, detectedKey, rawTitle, rawArtist };
+  promoteRepeatedVersesToChorus(finalBlocks);
+
+  return { blocks: finalBlocks, detectedKey, rawTitle, rawArtist };
+}
+
+/**
+ * Blocks with no explicit header default to type 'verse'. When the same
+ * lyrics (ignoring case/accents/punctuation) show up in more than one of
+ * those default-typed blocks, they're almost certainly the refrão repeated
+ * — relabel them so the user isn't stuck fixing every occurrence by hand.
+ */
+function normalizeForCompare(block: ChordBlock): string {
+  return block.lines
+    .map((l) => l.lyrics
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s]/g, '')
+      .trim())
+    .filter(Boolean)
+    .join('|');
+}
+
+function promoteRepeatedVersesToChorus(blocks: ChordBlock[]): void {
+  const counts = new Map<string, number>();
+  for (const b of blocks) {
+    if (b.type !== 'verse') continue;
+    const key = normalizeForCompare(b);
+    if (!key) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  for (const b of blocks) {
+    if (b.type !== 'verse') continue;
+    const key = normalizeForCompare(b);
+    if (key && (counts.get(key) || 0) > 1) {
+      b.type = 'chorus';
+      b.label = 'Refrão';
+    }
+  }
 }
 
 /**

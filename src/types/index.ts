@@ -159,6 +159,8 @@ export interface MasterSong {
   versions: SongVersion[];
   /** Whether the chord sheet has been manually reviewed/adjusted */
   isAdjusted: boolean;
+  /** Arquivada = fora da lista principal; volta automaticamente ao ser adicionada a uma playlist */
+  isArchived: boolean;
   /** Search-optimized: full lyrics concatenated for text search */
   searchableLyrics?: string;
   createdAt: string;

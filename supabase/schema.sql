@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS master_songs (
                                 CHECK (nature IN ('louvor', 'hino')),
   searchable_lyrics TEXT,
   is_adjusted       BOOLEAN     NOT NULL DEFAULT false,
+  is_archived       BOOLEAN     NOT NULL DEFAULT false, -- fora da lista principal; some ao entrar numa playlist (desde 2026-07-16)
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
