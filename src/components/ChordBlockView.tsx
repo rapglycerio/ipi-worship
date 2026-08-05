@@ -111,15 +111,7 @@ export default function ChordBlockView({ block, viewMode, fontSize, transposeSem
   return (
     <div className={`${blockStyle} py-3 mb-3 animate-fade-in`}>
       <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-accent">{typeLabel}</span>
-          {block.repeatCount > 1 && (
-            <span className="stage-pill">
-              <Repeat className="w-3 h-3" />
-              {block.repeatCount}x
-            </span>
-          )}
-        </div>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-accent">{typeLabel}</span>
         {block.directions.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap justify-end">
             {block.directions.map((dir, i) => <DirectionPill key={i} direction={dir} />)}
@@ -153,6 +145,15 @@ export default function ChordBlockView({ block, viewMode, fontSize, transposeSem
           ))}
         </div>
       </div>
+
+      {block.repeatCount > 1 && (
+        <div className="mt-3 pt-2 border-t border-dashed border-accent/30 flex items-center justify-end gap-1.5">
+          <Repeat className="w-4 h-4 text-accent" />
+          <span className="text-sm font-bold text-accent uppercase tracking-wide">
+            Repetir {block.repeatCount}x
+          </span>
+        </div>
+      )}
     </div>
   );
 }

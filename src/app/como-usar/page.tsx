@@ -21,6 +21,11 @@ import {
   ClipboardCheck,
   UserCog,
   BookOpen,
+  Archive,
+  CheckCircle2,
+  Zap,
+  Lightbulb,
+  Lock,
 } from 'lucide-react';
 
 export const metadata: Metadata = {
@@ -144,9 +149,13 @@ export default function ComoUsarPage() {
               <Smartphone className="w-4 h-4 text-accent" /> Android (Chrome)
             </p>
             <ol className="space-y-3">
-              <Step icon={SquarePlus} title="Menu ⋮ → Instalar aplicativo">
-                Abra o menu do Chrome no canto superior direito e toque em “Instalar aplicativo”
-                (ou aceite o aviso que aparece na parte de baixo da tela).
+              <Step icon={SquarePlus} title="Toque em “Instalar app”">
+                Um aviso aparece sozinho na parte de baixo da tela depois de alguns segundos. Se
+                não aparecer, abra o menu ⋮ do Chrome e toque em “Instalar aplicativo”.
+              </Step>
+              <Step icon={Share2} title="Abriu pelo WhatsApp ou Instagram?">
+                Esses apps mostram a página num navegador simplificado, sem a opção de instalar.
+                Toque em “Abrir no navegador” no menu deles primeiro.
               </Step>
             </ol>
           </div>
@@ -168,6 +177,10 @@ export default function ComoUsarPage() {
           <Step icon={Search} title="Aba Busca">
             Procure pelo título ou por um trecho da letra — útil quando você só lembra de um pedaço
             da música.
+          </Step>
+          <Step icon={Archive} title="Aba Arquivadas">
+            Músicas que não tocamos há um bom tempo saem da lista principal — mas voltam sozinhas
+            assim que alguém as adiciona numa playlist de novo.
           </Step>
         </ol>
       </Section>
@@ -200,6 +213,18 @@ export default function ComoUsarPage() {
           </Step>
           <Step icon={MonitorSmartphone} title="Manter tela ligada">
             Ative para o celular não apagar no meio da música.
+          </Step>
+          <Step icon={CheckCircle2} title="Selo “Ajustada”">
+            Indica que alguém já revisou a cifra linha por linha. Sem o selo, os acordes vieram
+            direto da importação — vale conferir antes de tocar.
+          </Step>
+          <Step icon={Zap} title="Dinâmica e repetição do bloco">
+            Indicações como crescendo, solo ou silêncio aparecem no topo de cada bloco; quantas
+            vezes repetir (2x, 3x…) aparece embaixo, junto da letra.
+          </Step>
+          <Step icon={Lightbulb} title="Sugerir para o culto">
+            Logado, toque em “Sugerir” na página da cifra para indicar a música a quem monta o
+            repertório.
           </Step>
         </ol>
       </Section>
@@ -245,6 +270,14 @@ export default function ComoUsarPage() {
           <Step icon={GripVertical} title="Ordene arrastando">
             No modo edição, arraste as músicas para deixá-las na ordem da liturgia.
           </Step>
+          <Step icon={Lock} title="Playlist Particular">
+            Marque “Particular” ao criar — fica visível só pra você, ótimo pra ensaiar sozinho sem
+            misturar com o repertório oficial.
+          </Step>
+          <Step icon={ListMusic} title="Repertório Fixo">
+            Deixe sem data pra guardar uma lista sem culto marcado (ex.: músicas novas em
+            preparação) — ela fica sempre no topo de “Próximas”.
+          </Step>
           <Step icon={Share2} title="Compartilhe no grupo">
             O botão de compartilhar copia o link da playlist — cole no grupo da equipe e todo mundo
             abre o repertório no celular.
@@ -256,8 +289,16 @@ export default function ComoUsarPage() {
       <Section id="admin" eyebrow="Para administradores" title="Gestão do repertório">
         <ol className="space-y-4">
           <Step icon={Upload} title="Importar Cifra">
-            Cadastre músicas novas colando a cifra — o app entende os blocos (intro, verso,
-            refrão) e monta a página automaticamente.
+            Cole o texto da cifra — o app detecta os blocos automaticamente e ainda deixa você
+            conferir, juntar ou renomear cada um antes de editar letra e acordes.
+          </Step>
+          <Step icon={Archive} title="Arquivar músicas">
+            Na página da cifra, o botão “Arquivar” tira a música da lista principal sem apagar o
+            histórico — ela volta sozinha se for usada numa playlist.
+          </Step>
+          <Step icon={Lightbulb} title="Sugestões da Congregação">
+            Na aba Playlists, aprove sugestões de membros direto pra playlist ou dispense as que
+            não forem usar.
           </Step>
           <Step icon={ClipboardCheck} title="Análises de Louvor">
             Registre o parecer teológico de cada música (aprovada, pendente ou rejeitada) — o selo

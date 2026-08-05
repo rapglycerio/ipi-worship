@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Circle,
   Users,
+  History,
 } from 'lucide-react';
 
 interface SongCardProps {
@@ -21,9 +22,11 @@ interface SongCardProps {
   playlistId?: string;
   /** Service key override (transposedKey) — shown instead of the version's key. */
   overrideKey?: string;
+  /** Data da última vez que a música apareceu numa playlist já realizada. */
+  lastPlayedLabel?: string;
 }
 
-export default function SongCard({ song, compact = false, index, playlistId, overrideKey }: SongCardProps) {
+export default function SongCard({ song, compact = false, index, playlistId, overrideKey, lastPlayedLabel }: SongCardProps) {
   const defaultVersion = getDefaultVersion(song);
   if (!defaultVersion) return null;
 
@@ -106,6 +109,14 @@ export default function SongCard({ song, compact = false, index, playlistId, ove
                 <Clock className="w-3 h-3" />
                 {defaultVersion.bpm} BPM
               </span>
+
+              {/* Última vez tocada (só quando ordenando por isso) */}
+              {lastPlayedLabel && (
+                <span className="inline-flex items-center gap-1 text-[11px] text-muted">
+                  <History className="w-3 h-3" />
+                  {lastPlayedLabel}
+                </span>
+              )}
 
               {/* Nature */}
               <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${

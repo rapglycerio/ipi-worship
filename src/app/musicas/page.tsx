@@ -20,7 +20,11 @@ import {
   CheckCircle2,
   Circle,
   Archive,
+  ArrowDownAZ,
+  History,
 } from 'lucide-react';
+
+type SortMode = 'alphabetical' | 'lastPlayed';
 
 const allTags: LiturgicalTag[] = [
   'introducao', 'exaltacao', 'adoracao', 'intercessao', 'perdao',
@@ -36,10 +40,27 @@ export default function MusicasPage() {
   const [selectedAdjusted, setSelectedAdjusted] = useState<'all' | 'adjusted' | 'pending'>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
+  const [sortBy, setSortBy] = useState<SortMode>('alphabetical');
 
   const activeSongs = useMemo(() => songs.filter((s) => !s.isArchived), [songs]);
   const archivedSongs = useMemo(() => songs.filter((s) => s.isArchived), [songs]);
   const tabSongs = activeTab === 'archived' ? archivedSongs : activeSongs;
+
+  // Data (ISO) da última vez que cada música apareceu numa playlist já realizada.
+  const lastPlayedMap = useMemo(() => {
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const map = new Map<string, string>();
+    for (const pl of playlists) {
+      if (!pl.serviceDate || pl.serviceDate > todayIso) continue;
+      for (const arr of pl.arrangements) {
+        const current = map.get(arr.masterSongId);
+        if (!current || pl.serviceDate > current) {
+          map.set(arr.masterSongId, pl.serviceDate);
+        }
+      }
+    }
+    return map;
+  }, [playlists]);
 
   const filteredSongs = useMemo(() => {
     const base = tabSongs.filter((song) => {
@@ -50,7 +71,19 @@ export default function MusicasPage() {
       return true;
     });
 
-    if (!searchQuery.trim()) return base;
+    if (!searchQuery.trim()) {
+      if (sortBy === 'lastPlayed') {
+        return [...base].sort((a, b) => {
+          const da = lastPlayedMap.get(a.id);
+          const db = lastPlayedMap.get(b.id);
+          if (da && db) return db.localeCompare(da);
+          if (da) return -1;
+          if (db) return 1;
+          return a.title.localeCompare(b.title);
+        });
+      }
+      return base;
+    }
 
     // Com busca ativa, ordena por relevância: título > artista > letra
     return base
@@ -68,7 +101,7 @@ export default function MusicasPage() {
       .filter((x): x is { song: typeof songs[number]; rank: number } => x !== null)
       .sort((a, b) => a.rank - b.rank || a.song.title.localeCompare(b.song.title))
       .map((x) => x.song);
-  }, [tabSongs, searchQuery, selectedNature, selectedTag, selectedAdjusted]);
+  }, [tabSongs, searchQuery, selectedNature, selectedTag, selectedAdjusted, sortBy, lastPlayedMap]);
 
   const approvedCount = songs.filter((s) => s.analysis?.status === 'approved').length;
   const pendingCount = songs.filter((s) => !s.analysis || s.analysis.status === 'pending').length;
@@ -175,21 +208,47 @@ export default function MusicasPage() {
           )}
         </div>
 
-        {/* Filter Toggle */}
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`
-            flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer
-            transition-all duration-200
-            ${showFilters ? 'bg-accent-subtle text-accent' : 'bg-elevated text-muted hover:bg-border'}
-          `}
-        >
-          <Filter className="w-3.5 h-3.5" />
-          Filtros
-          {(selectedNature !== 'all' || selectedTag || selectedAdjusted !== 'all') && (
-            <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+        {/* Filter + Sort Toggles */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`
+              flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer
+              transition-all duration-200
+              ${showFilters ? 'bg-accent-subtle text-accent' : 'bg-elevated text-muted hover:bg-border'}
+            `}
+          >
+            <Filter className="w-3.5 h-3.5" />
+            Filtros
+            {(selectedNature !== 'all' || selectedTag || selectedAdjusted !== 'all') && (
+              <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+            )}
+          </button>
+
+          {/* Ordenação — irrelevante durante uma busca, que já ordena por relevância */}
+          {!searchQuery.trim() && (
+            <div className="flex items-center bg-elevated rounded-lg p-0.5">
+              <button
+                onClick={() => setSortBy('alphabetical')}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-all ${
+                  sortBy === 'alphabetical' ? 'bg-accent text-white' : 'text-muted hover:bg-border'
+                }`}
+              >
+                <ArrowDownAZ className="w-3.5 h-3.5" />
+                A-Z
+              </button>
+              <button
+                onClick={() => setSortBy('lastPlayed')}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-all ${
+                  sortBy === 'lastPlayed' ? 'bg-accent text-white' : 'text-muted hover:bg-border'
+                }`}
+              >
+                <History className="w-3.5 h-3.5" />
+                Última vez tocada
+              </button>
+            </div>
           )}
-        </button>
+        </div>
 
         {/* Filter Panel */}
         {showFilters && (
@@ -304,11 +363,20 @@ export default function MusicasPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredSongs.map((song, i) => (
-              <div key={song.id} className="animate-slide-up" style={{ animationDelay: `${i * 50}ms` }}>
-                <SongCard song={song} />
-              </div>
-            ))}
+            {filteredSongs.map((song, i) => {
+              const lastPlayed = lastPlayedMap.get(song.id);
+              const lastPlayedLabel =
+                sortBy === 'lastPlayed'
+                  ? lastPlayed
+                    ? new Date(`${lastPlayed}T00:00:00`).toLocaleDateString('pt-BR')
+                    : 'Nunca tocada'
+                  : undefined;
+              return (
+                <div key={song.id} className="animate-slide-up" style={{ animationDelay: `${i * 50}ms` }}>
+                  <SongCard song={song} lastPlayedLabel={lastPlayedLabel} />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
