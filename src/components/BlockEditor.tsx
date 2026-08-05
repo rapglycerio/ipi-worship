@@ -499,24 +499,6 @@ function BlockCard({
               title="Nome personalizado do bloco"
             />
           )}
-          <span className="inline-flex items-center gap-0.5 bg-accent/10 rounded-full px-1.5 py-0.5">
-            <Repeat className="w-3 h-3 text-accent" />
-            <button
-              onClick={() => onChange({ ...block, repeatCount: Math.max(1, block.repeatCount - 1) })}
-              disabled={block.repeatCount <= 1}
-              className="w-4 h-4 flex items-center justify-center text-accent/60 hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer rounded text-sm leading-none font-bold"
-              title="Menos repetições"
-            >−</button>
-            <span className="text-[11px] font-semibold text-accent tabular-nums w-4 text-center select-none">
-              {block.repeatCount}x
-            </span>
-            <button
-              onClick={() => onChange({ ...block, repeatCount: Math.min(10, block.repeatCount + 1) })}
-              disabled={block.repeatCount >= 10}
-              className="w-4 h-4 flex items-center justify-center text-accent/60 hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer rounded text-sm leading-none font-bold"
-              title="Mais repetições"
-            >+</button>
-          </span>
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0">
@@ -534,6 +516,13 @@ function BlockCard({
           </button>
         </div>
       </div>
+
+      {/* ── Stage directions (dinâmica) — logo abaixo do cabeçalho, mais
+          visível do que a repetição, que é um detalhe menor movido pro fim */}
+      <DirectionsEditor
+        directions={block.directions}
+        onChange={(d) => onChange({ ...block, directions: d })}
+      />
 
       {/* ── Lines ── */}
       <div className="space-y-0">
@@ -601,11 +590,30 @@ function BlockCard({
         linha
       </button>
 
-      {/* ── Stage directions ── */}
-      <DirectionsEditor
-        directions={block.directions}
-        onChange={(d) => onChange({ ...block, directions: d })}
-      />
+      {/* ── Repetição ── */}
+      <div className="mt-3 pt-2.5 border-t border-border/50 flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-subtle flex items-center gap-1.5">
+          <Repeat className="w-3 h-3" />
+          Repetição do bloco
+        </span>
+        <span className="inline-flex items-center gap-0.5 bg-accent/10 rounded-full px-1.5 py-0.5">
+          <button
+            onClick={() => onChange({ ...block, repeatCount: Math.max(1, block.repeatCount - 1) })}
+            disabled={block.repeatCount <= 1}
+            className="w-4 h-4 flex items-center justify-center text-accent/60 hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer rounded text-sm leading-none font-bold"
+            title="Menos repetições"
+          >−</button>
+          <span className="text-[11px] font-semibold text-accent tabular-nums w-4 text-center select-none">
+            {block.repeatCount}x
+          </span>
+          <button
+            onClick={() => onChange({ ...block, repeatCount: Math.min(10, block.repeatCount + 1) })}
+            disabled={block.repeatCount >= 10}
+            className="w-4 h-4 flex items-center justify-center text-accent/60 hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer rounded text-sm leading-none font-bold"
+            title="Mais repetições"
+          >+</button>
+        </span>
+      </div>
     </div>
   );
 }
