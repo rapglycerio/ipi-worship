@@ -147,7 +147,7 @@ export default function ChordBlockView({ block, viewMode, fontSize, transposeSem
       </div>
 
       {block.repeatCount > 1 && (
-        <div className="mt-3 pt-2 border-t border-dashed border-accent/30 flex items-center justify-end gap-1.5">
+        <div className="mt-3 pt-2 border-t border-dashed border-accent/30 flex items-center justify-start gap-1.5">
           <Repeat className="w-4 h-4 text-accent" />
           <span className="text-sm font-bold text-accent uppercase tracking-wide">
             Repetir {block.repeatCount}x
