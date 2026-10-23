@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, X, Plus, Loader2 } from 'lucide-react';
 import { searchRank } from '@/lib/search';
 import type { MasterSong } from '@/types';
@@ -19,6 +19,22 @@ export default function AddSongModal({
 }) {
   const [search, setSearch] = useState('');
   const [adding, setAdding] = useState<string | null>(null);
+  // No celular o teclado não redimensiona o layout (iOS) e cobre a parte de baixo
+  // do modal; acompanhar o visualViewport mantém a lista na área visível.
+  const [viewport, setViewport] = useState<{ height: number; top: number } | null>(null);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setViewport({ height: vv.height, top: vv.offsetTop });
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
 
   const available = songs
     .filter((s) => !existingIds.includes(s.id))
@@ -37,9 +53,12 @@ export default function AddSongModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+    <div
+      className="fixed inset-x-0 top-0 bottom-0 z-50 flex items-end sm:items-center justify-center p-4"
+      style={viewport ? { top: viewport.top, bottom: 'auto', height: viewport.height } : undefined}
+    >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl animate-slide-up flex flex-col max-h-[70vh]">
+      <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl animate-slide-up flex flex-col max-h-[min(70vh,100%)]">
         <div className="flex items-center justify-between p-5 border-b border-border">
           <h2 className="text-lg font-bold text-foreground">Adicionar Música</h2>
           <button
