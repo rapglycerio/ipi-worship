@@ -130,6 +130,8 @@ export interface SongVersion {
   key: MusicalKey;
   /** Beats per minute (integer) */
   bpm: number;
+  /** Fórmula de compasso (ex.: "4/4", "3/4", "6/8"); ausente = não informado */
+  timeSignature?: string;
   /** Modular chord blocks */
   blocks: ChordBlock[];
   /** YouTube video link */

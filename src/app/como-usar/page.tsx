@@ -260,8 +260,9 @@ export default function ComoUsarPage() {
         shotAlt="Tela de playlists com aba de próximas e anteriores"
       >
         <ol className="space-y-4">
-          <Step icon={LogIn} title="Entre com sua conta Google">
-            Criar e editar playlists exige login — visitantes só visualizam.
+          <Step icon={LogIn} title="Entre na sua conta">
+            Criar e editar playlists exige login — visitantes só visualizam. Dá para entrar com
+            Google ou criar uma conta com e-mail e senha (esqueceu a senha? o administrador redefine).
           </Step>
           <Step icon={Plus} title="Nova Playlist">
             Defina nome, data e culto (manhã/noite). Depois adicione músicas pelo botão “Adicionar

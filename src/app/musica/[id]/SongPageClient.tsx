@@ -1,12 +1,13 @@
 'use client';
 
-import { use, useState, useEffect, useCallback, useRef } from 'react';
+import { use, useState, useEffect, useCallback, useRef, type CSSProperties } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import { liturgicalTagLabels } from '@/data/mock-songs';
-import ChordBlockView, { ChordToolbar } from '@/components/ChordBlockView';
+import ChordBlockView, { ChordToolbar, CHORD_COLORS, MAX_CAPO, transposeKey } from '@/components/ChordBlockView';
 import BlockEditor from '@/components/BlockEditor';
 import { useWakeLock } from '@/hooks/useWakeLock';
+import { TIME_SIGNATURES } from '@/components/Metronome';
 import type { MasterSong, ViewMode, FontSizePreset, LiturgicalTag, SongNature, Playlist, ChordBlock } from '@/types';
 import {
   ArrowLeft,
@@ -88,6 +89,7 @@ function AutoScroller() {
   const rafRef = useRef<number | null>(null);
   const lastRef = useRef<number>(0);
   const accRef = useRef<number>(0);
+  const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!playing) {
@@ -107,62 +109,74 @@ function AutoScroller() {
         window.scrollBy({ top: whole, behavior: 'instant' });
         accRef.current -= whole;
       }
+      // Chegou ao fim da página: para sozinho.
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      if (atBottom) {
+        setPlaying(false);
+        return;
+      }
       rafRef.current = requestAnimationFrame(step);
     }
     rafRef.current = requestAnimationFrame(step);
-    return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
+
+    // Tocar na tela (fora da barra) pausa — o músico retoma quando quiser.
+    const pauseOnTouch = (e: Event) => {
+      if (barRef.current?.contains(e.target as Node)) return;
+      setPlaying(false);
+    };
+    window.addEventListener('pointerdown', pauseOnTouch);
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      window.removeEventListener('pointerdown', pauseOnTouch);
+    };
   }, [playing, speedIdx]);
 
   return (
     <div
-      className="fixed right-3 z-30 no-print flex items-center gap-1.5 bg-card/95 backdrop-blur-sm border border-border rounded-full shadow-lg px-2.5 py-1.5"
-      style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}
+      ref={barRef}
+      className="autoscroll-bar fixed z-30 no-print flex items-center gap-2 bg-card/95 backdrop-blur-sm border border-border rounded-full shadow-lg px-2 py-1.5"
     >
-      {/* Play / Pause */}
+      {/* Diminuir velocidade */}
+      <button
+        onClick={() => setSpeedIdx(i => Math.max(MIN_SPEED, i - 1))}
+        disabled={speedIdx === MIN_SPEED}
+        className="w-11 h-11 flex items-center justify-center rounded-full bg-elevated text-foreground hover:bg-border disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors text-xl font-bold"
+        aria-label="Diminuir velocidade"
+      >−</button>
+
+      {/* Play / Pause — alvo grande para tocar sem olhar */}
       <button
         onClick={() => setPlaying(p => !p)}
-        className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors cursor-pointer
-          ${playing ? 'bg-accent text-white' : 'bg-elevated text-muted hover:bg-border'}`}
+        className={`w-14 h-14 flex items-center justify-center rounded-full transition-colors cursor-pointer shadow-md
+          ${playing ? 'bg-accent text-white' : 'bg-accent/15 text-accent hover:bg-accent/25'}`}
         aria-label={playing ? 'Pausar rolagem' : 'Rolar automaticamente'}
       >
-        {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+        {playing ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
       </button>
 
-      {/* Speed stepper */}
-      <div className="flex items-center gap-1">
-        <button
-          onClick={() => setSpeedIdx(i => Math.max(MIN_SPEED, i - 1))}
-          disabled={speedIdx === MIN_SPEED}
-          className="w-6 h-6 flex items-center justify-center rounded-full text-muted hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors text-sm font-bold"
-          aria-label="Diminuir velocidade"
-        >−</button>
+      {/* Aumentar velocidade */}
+      <button
+        onClick={() => setSpeedIdx(i => Math.min(MAX_SPEED, i + 1))}
+        disabled={speedIdx === MAX_SPEED}
+        className="w-11 h-11 flex items-center justify-center rounded-full bg-elevated text-foreground hover:bg-border disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors text-xl font-bold"
+        aria-label="Aumentar velocidade"
+      >+</button>
 
-        <div className="flex items-center gap-0.5">
+      {/* Indicador de velocidade */}
+      <div className="flex flex-col items-center gap-1 pr-2 pl-0.5">
+        <div className="flex items-end gap-0.5 h-4" aria-label={`Velocidade ${speedIdx + 1} de ${SPEED_LEVELS.length}`}>
           {SPEED_LEVELS.map((_, i) => (
             <button
               key={i}
               onClick={() => setSpeedIdx(i)}
-              className={`rounded-full transition-all cursor-pointer ${
-                i === speedIdx
-                  ? 'w-2.5 h-2.5 bg-accent'
-                  : i < speedIdx
-                    ? 'w-1.5 h-1.5 bg-accent/40'
-                    : 'w-1.5 h-1.5 bg-border hover:bg-muted'
-              }`}
+              className={`w-1.5 rounded-sm cursor-pointer transition-colors ${i <= speedIdx ? 'bg-accent' : 'bg-border'}`}
+              style={{ height: `${6 + i * 2.5}px` }}
               aria-label={`Velocidade ${i + 1}`}
             />
           ))}
         </div>
-
-        <button
-          onClick={() => setSpeedIdx(i => Math.min(MAX_SPEED, i + 1))}
-          disabled={speedIdx === MAX_SPEED}
-          className="w-6 h-6 flex items-center justify-center rounded-full text-muted hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors text-sm font-bold"
-          aria-label="Aumentar velocidade"
-        >+</button>
+        <Gauge className="w-3 h-3 text-subtle" />
       </div>
-
-      <Gauge className="w-3 h-3 text-subtle shrink-0" />
     </div>
   );
 }
@@ -401,6 +415,7 @@ function EditSongModal({ song, onClose, onSaved }: EditSongModalProps) {
   const [artists, setArtists] = useState(defaultVersion?.artists.join(', ') || '');
   const [key, setKey] = useState<string>(defaultVersion?.key || '');
   const [bpm, setBpm] = useState(String(defaultVersion?.bpm || ''));
+  const [timeSignature, setTimeSignature] = useState(defaultVersion?.timeSignature || '');
   const [youtubeUrl, setYoutubeUrl] = useState(defaultVersion?.youtubeUrl || '');
   const [saving, setSaving] = useState(false);
 
@@ -425,6 +440,9 @@ function EditSongModal({ song, onClose, onSaved }: EditSongModalProps) {
           ? updateVersionMetadata(defaultVersion.id, {
               key: key.trim() || undefined,
               bpm: parseInt(bpm) || undefined,
+              // Só envia quando muda — evita tocar na coluna à toa.
+              timeSignature:
+                timeSignature !== (defaultVersion.timeSignature || '') ? timeSignature : undefined,
               youtubeUrl: youtubeUrl.trim() || undefined,
               artists: artists
                 .split(',')
@@ -532,6 +550,24 @@ function EditSongModal({ song, onClose, onSaved }: EditSongModalProps) {
                     placeholder="72"
                     className="w-full px-3 py-2.5 bg-elevated border border-border rounded-lg text-sm text-foreground placeholder:text-subtle focus:outline-none focus:border-accent/50"
                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-subtle mb-1 block">Compasso</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {['', ...TIME_SIGNATURES].map((ts) => (
+                    <button
+                      key={ts || 'none'}
+                      type="button"
+                      onClick={() => setTimeSignature(ts)}
+                      className={`px-3 py-2 rounded-lg text-xs font-mono font-bold cursor-pointer transition-all ${
+                        timeSignature === ts ? 'bg-accent text-white' : 'bg-elevated text-muted hover:bg-border'
+                      }`}
+                    >
+                      {ts || '—'}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -770,6 +806,8 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
   const [viewMode, setViewMode] = useState<ViewMode>('lyrics_only');
   const [fontSize, setFontSize] = useState<FontSizePreset>('md');
   const [transposeSemitones, setTransposeSemitones] = useState(0);
+  const [capo, setCapo] = useState(0);
+  const [chordColor, setChordColor] = useState<string | null>(null);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
@@ -790,6 +828,13 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
   const { isActive: wakeLockActive, isSupported: wakeLockSupported, toggle: toggleWakeLock } = useWakeLock();
 
   const loadSong = useCallback(async () => {
+    // Capotraste é por música: cada uma lembra a casa usada da última vez neste aparelho.
+    try {
+      const saved = parseInt(localStorage.getItem(`worship_capo:${id}`) ?? '0', 10);
+      setCapo(Number.isFinite(saved) && saved >= 0 && saved <= MAX_CAPO ? saved : 0);
+    } catch {
+      setCapo(0);
+    }
     try {
       const { fetchSongById } = await import('@/lib/data');
       const dbSong = await fetchSongById(id);
@@ -811,6 +856,10 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
     prefsLoaded.current = true;
     const savedSize = localStorage.getItem('worship_fontSize') as FontSizePreset | null;
     if (savedSize && ['sm', 'md', 'lg', 'xl', '2xl'].includes(savedSize)) setFontSize(savedSize);
+    try {
+      const savedColor = localStorage.getItem('worship_chordColor');
+      if (savedColor && CHORD_COLORS.some((c) => c.value === savedColor)) setChordColor(savedColor);
+    } catch { /* storage indisponível */ }
   }, []);
 
   // Usuário logado: aplica a preferência de visualização salva na conta
@@ -927,6 +976,22 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
     localStorage.setItem('worship_fontSize', size);
   };
 
+  const handleCapoChange = (n: number) => {
+    setCapo(n);
+    try {
+      if (n === 0) localStorage.removeItem(`worship_capo:${id}`);
+      else localStorage.setItem(`worship_capo:${id}`, String(n));
+    } catch { /* storage indisponível */ }
+  };
+
+  const handleChordColorChange = (color: string | null) => {
+    setChordColor(color);
+    try {
+      if (color === null) localStorage.removeItem('worship_chordColor');
+      else localStorage.setItem('worship_chordColor', color);
+    } catch { /* storage indisponível */ }
+  };
+
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
     // Só persiste pra quem está logado — anônimo sempre volta a "só letra"
@@ -1012,7 +1077,10 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
   };
 
   return (
-    <div className="min-h-screen pb-20">
+    <div
+      className="min-h-screen pb-44 md:pb-28"
+      style={chordColor ? ({ '--chord-color': chordColor } as CSSProperties) : undefined}
+    >
       {/* Auto-scroll widget */}
       <AutoScroller />
 
@@ -1467,7 +1535,8 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
           <p className="text-sm text-gray-600 mt-0.5">{activeVersion.artists.join(', ')}</p>
         )}
         <p className="text-sm font-mono mt-0.5">
-          Tom: {activeVersion.key}
+          Tom: {transposeKey(activeVersion.key, transposeSemitones)}
+          {capo > 0 ? `  ·  Capo ${capo}ª (formas em ${transposeKey(activeVersion.key, transposeSemitones - capo)})` : ''}
           {activeVersion.bpm ? `  ·  ${activeVersion.bpm} BPM` : ''}
         </p>
       </div>
@@ -1477,15 +1546,20 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
         songTitle={song.title}
         currentKey={activeVersion.key}
         bpm={activeVersion.bpm}
+        timeSignature={activeVersion.timeSignature}
         viewMode={viewMode}
         fontSize={fontSize}
         transposeSemitones={transposeSemitones}
+        capo={capo}
+        chordColor={chordColor}
         onViewModeChange={handleViewModeChange}
         onFontSizeChange={handleFontSizeChange}
         onTransposeChange={setTransposeSemitones}
+        onCapoChange={handleCapoChange}
+        onChordColorChange={handleChordColorChange}
       />
 
-      {/* Blocks */}
+      {/* Blocks — com capo, mostra as formas (tom que soa − casa do capo) */}
       <div className="px-5 md:px-8 py-4">
         {activeVersion.blocks.map((block) => (
           <ChordBlockView
@@ -1493,7 +1567,7 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
             block={block}
             viewMode={viewMode}
             fontSize={fontSize}
-            transposeSemitones={transposeSemitones}
+            transposeSemitones={transposeSemitones - capo}
           />
         ))}
       </div>
