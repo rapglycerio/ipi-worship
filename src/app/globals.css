@@ -170,6 +170,27 @@ body {
   user-select: text;
 }
 
+/* Acorde tocável (abre o diagrama). Sem padding/borda para não quebrar as colunas. */
+.chord-token {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  border-radius: 3px;
+  text-decoration: underline dotted transparent;
+  text-underline-offset: 3px;
+  transition: background-color 0.15s, text-decoration-color 0.15s;
+}
+.chord-token:hover,
+.chord-token:focus-visible {
+  text-decoration-color: currentColor;
+  background-color: color-mix(in srgb, currentColor 12%, transparent);
+  outline: none;
+}
+
 /* Barra de rolagem automática: centralizada acima da tab bar no celular,
    no canto inferior direito no desktop (não há tab bar). */
 .autoscroll-bar {
@@ -184,6 +205,10 @@ body {
     transform: none;
     bottom: 1.5rem;
   }
+}
+/* No modo palco não há tab bar: a barra desce para perto da borda. */
+.autoscroll-bar--stage {
+  bottom: calc(1rem + env(safe-area-inset-bottom));
 }
 
 .lyric-line {

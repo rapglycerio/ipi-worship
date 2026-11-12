@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import type { ChordBlock, ViewMode, FontSizePreset, StageDirectionItem } from '@/types';
 import Metronome from '@/components/Metronome';
+import { parseChord, simplifyChord } from '@/lib/chords';
 import {
   Check,
   SlidersHorizontal,
   Timer,
+  Maximize2,
   Eye,
   EyeOff,
   Type,
@@ -26,6 +28,128 @@ interface ChordBlockViewProps {
   viewMode: ViewMode;
   fontSize: FontSizePreset;
   transposeSemitones: number;
+  /** Mostra só fundamental + maior/menor (A7M(9) → A). */
+  simplify?: boolean;
+  /** Toque num acorde (ex.: abrir o diagrama). Recebe o acorde como exibido. */
+  onChordClick?: (chord: string) => void;
+}
+
+/** Acorde exibido; tocável (abre o diagrama) quando é um acorde reconhecido. */
+function ChordText({ chord, onChordClick }: { chord: string; onChordClick?: (chord: string) => void }) {
+  if (!onChordClick || !parseChord(chord)) return <>{chord}</>;
+  return (
+    <button
+      type="button"
+      onClick={() => onChordClick(chord)}
+      className="chord-token"
+      aria-label={`Ver diagrama de ${chord}`}
+    >
+      {chord}
+    </button>
+  );
+}
+
+interface PlacedChord {
+  col: number;
+  text: string;
+}
+
+/** Acordes de uma linha com a coluna ORIGINAL de cada um (transpor não empurra os seguintes). */
+function placeChords(chords: string, mapChord: (c: string) => string): PlacedChord[] {
+  const out: PlacedChord[] = [];
+  for (const m of chords.matchAll(/\S+/g)) out.push({ col: m.index ?? 0, text: mapChord(m[0]) });
+  return out;
+}
+
+/**
+ * Cifra + letra que quebra linha como texto comum, sem rolagem lateral.
+ *
+ * A letra é cortada em pedaços nas colunas dos acordes e no começo de cada
+ * palavra; cada pedaço leva o acorde que fica sobre ele. Pedaços da mesma
+ * palavra ficam grudados (não quebram no meio), e a quebra acontece entre
+ * palavras — o acorde continua sempre em cima da sílaba certa.
+ */
+function ChordLyricLine({
+  placed,
+  lyrics,
+  fontClass,
+  onChordClick,
+}: {
+  placed: PlacedChord[];
+  lyrics: string;
+  fontClass: string;
+  onChordClick?: (chord: string) => void;
+}) {
+  const lastChordEnd = placed.reduce((m, c) => Math.max(m, c.col + 1), 0);
+  const text = lyrics.padEnd(lastChordEnd);
+  const chordAt = new Map(placed.map((c) => [c.col, c.text]));
+
+  // Cortes: começo, cada acorde e cada início de palavra.
+  const cuts = new Set<number>([0, ...placed.map((c) => c.col)]);
+  for (let i = 1; i < text.length; i++) if (text[i] !== ' ' && text[i - 1] === ' ') cuts.add(i);
+  const sorted = [...cuts].filter((c) => c < text.length).sort((a, b) => a - b);
+
+  // Agrupa em palavras: novo grupo quando o pedaço começa com letra depois de espaço.
+  const words: { col: number; piece: string; chord?: string }[][] = [];
+  sorted.forEach((col, i) => {
+    const piece = text.slice(col, sorted[i + 1] ?? text.length);
+    const unit = { col, piece, chord: chordAt.get(col) };
+    const startsWord = col === 0 || (text[col] !== ' ' && text[col - 1] === ' ');
+    if (startsWord || words.length === 0) words.push([unit]);
+    else words[words.length - 1].push(unit);
+  });
+
+  return (
+    <div className="flex flex-wrap items-end">
+      {words.map((word, w) => (
+        <span key={w} className="inline-flex whitespace-pre">
+          {word.map((u) => (
+            <span key={u.col} className="inline-flex flex-col">
+              <span className={`chord-line ${fontClass}`} style={{ letterSpacing: 'normal', fontWeight: '500' }}>
+                {u.chord ? (
+                  // O acorde ocupa ao menos o seu tamanho + 1 espaço, para não colar no próximo.
+                  <span style={{ display: 'inline-block', minWidth: `${u.chord.length + 1}ch` }}>
+                    <ChordText chord={u.chord} onChordClick={onChordClick} />
+                  </span>
+                ) : (
+                  ' '
+                )}
+              </span>
+              <span className={`lyric-line whitespace-pre ${fontClass}`} style={{ letterSpacing: 'normal', fontWeight: '500' }}>
+                {u.piece}
+              </span>
+            </span>
+          ))}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Linha só de acordes (intro, solo…): quebra entre acordes quando não cabe. */
+function ChordOnlyLine({
+  placed,
+  fontClass,
+  onChordClick,
+}: {
+  placed: PlacedChord[];
+  fontClass: string;
+  onChordClick?: (chord: string) => void;
+}) {
+  return (
+    <div className={`chord-line ${fontClass}`} style={{ letterSpacing: 'normal', fontWeight: '500', whiteSpace: 'pre-wrap' }}>
+      {placed.map((c, i) => {
+        const prevEnd = i === 0 ? 0 : placed[i - 1].col + placed[i - 1].text.length;
+        const gap = Math.max(i === 0 ? 0 : 1, c.col - prevEnd);
+        return (
+          <span key={i}>
+            {' '.repeat(gap)}
+            <ChordText chord={c.text} onChordClick={onChordClick} />
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 // Chromatic scales for transposition
@@ -48,11 +172,6 @@ function transposeChord(chord: string, semitones: number): string {
     if (idx === -1) return match;
     return scale[((idx + semitones) % 12 + 12) % 12];
   });
-}
-
-function transposeLine(line: string, semitones: number): string {
-  if (semitones === 0) return line;
-  return line.replace(/\S+/g, (token) => transposeChord(token, semitones));
 }
 
 // Transpose just the root key for display in toolbar
@@ -109,7 +228,20 @@ function DirectionPill({ direction }: { direction: StageDirectionItem }) {
   );
 }
 
-export default function ChordBlockView({ block, viewMode, fontSize, transposeSemitones }: ChordBlockViewProps) {
+export default function ChordBlockView({
+  block,
+  viewMode,
+  fontSize,
+  transposeSemitones,
+  simplify = false,
+  onChordClick,
+}: ChordBlockViewProps) {
+  const mapChord = (chord: string) => {
+    const t = transposeChord(chord, transposeSemitones);
+    return simplify ? simplifyChord(t) : t;
+  };
+  const fontClass = fontSizeMap[fontSize];
+  const showChords = viewMode === 'chords_and_lyrics';
   const blockStyle = blockTypeStyles[block.type] || 'block-verse';
   const typeLabel = block.label || blockTypeLabels[block.type] || block.type;
 
@@ -124,31 +256,27 @@ export default function ChordBlockView({ block, viewMode, fontSize, transposeSem
         )}
       </div>
 
-      {/* overflow-x: auto permite scroll horizontal das cifras longas sem
-          afetar a página toda — essencial para leitura no celular */}
-      <div className="overflow-x-auto pb-0.5">
-        <div className="space-y-0.5">
-          {block.lines.map((line, i) => (
+      {/* Linhas longas quebram entre palavras (com o acorde junto), sem rolagem lateral. */}
+      <div className="space-y-0.5 min-w-0">
+        {block.lines.map((line, i) => {
+          if (line.blank) return <div key={i} className="h-3" aria-hidden="true" />;
+          const hasChords = showChords && line.chords.trim() !== '';
+          const hasLyrics = line.lyrics.trim() !== '';
+          const placed = hasChords ? placeChords(line.chords, mapChord) : [];
+          return (
             <div key={i}>
-              {line.blank ? (
-                <div className="h-3" aria-hidden="true" />
-              ) : (
-                <>
-                  {viewMode === 'chords_and_lyrics' && line.chords.trim() && (
-                    <div className={`chord-line ${fontSizeMap[fontSize]}`} style={{ letterSpacing: 'normal', fontWeight: '500' }}>
-                      {transposeLine(line.chords, transposeSemitones)}
-                    </div>
-                  )}
-                  {line.lyrics.trim() && (
-                    <div className={`lyric-line ${fontSizeMap[fontSize]}`} style={{ letterSpacing: 'normal', fontWeight: '500' }}>
-                      {line.lyrics}
-                    </div>
-                  )}
-                </>
-              )}
+              {hasChords && hasLyrics ? (
+                <ChordLyricLine placed={placed} lyrics={line.lyrics} fontClass={fontClass} onChordClick={onChordClick} />
+              ) : hasChords ? (
+                <ChordOnlyLine placed={placed} fontClass={fontClass} onChordClick={onChordClick} />
+              ) : hasLyrics ? (
+                <div className={`lyric-line ${fontClass}`} style={{ letterSpacing: 'normal', fontWeight: '500' }}>
+                  {line.lyrics}
+                </div>
+              ) : null}
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       {block.repeatCount > 1 && (
@@ -188,11 +316,15 @@ interface ChordToolbarProps {
   transposeSemitones: number;
   capo: number;
   chordColor: string | null;
+  simplify: boolean;
   onViewModeChange: (mode: ViewMode) => void;
   onFontSizeChange: (size: FontSizePreset) => void;
   onTransposeChange: (semitones: number) => void;
   onCapoChange: (capo: number) => void;
   onChordColorChange: (color: string | null) => void;
+  onSimplifyChange: (simplify: boolean) => void;
+  /** Abre o modo palco (tela cheia só com a cifra). */
+  onStageMode?: () => void;
 }
 
 const fontSizes: FontSizePreset[] = ['sm', 'md', 'lg', 'xl', '2xl'];
@@ -207,11 +339,14 @@ export function ChordToolbar({
   transposeSemitones,
   capo,
   chordColor,
+  simplify,
   onViewModeChange,
   onFontSizeChange,
   onTransposeChange,
   onCapoChange,
   onChordColorChange,
+  onSimplifyChange,
+  onStageMode,
 }: ChordToolbarProps) {
   const [showOptions, setShowOptions] = useState(false);
   const [showMetronome, setShowMetronome] = useState(false);
@@ -232,6 +367,9 @@ export function ChordToolbar({
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold text-foreground truncate">{songTitle}</h2>
           <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+            {simplify && (
+              <span className="text-[11px] font-semibold text-success">Simplificado</span>
+            )}
             <span className="text-[11px] font-mono font-semibold text-accent">
               Tom: {transposedKey}
               {deltaLabel && <span className="text-subtle ml-1">({deltaLabel})</span>}
@@ -266,6 +404,16 @@ export function ChordToolbar({
         <button onClick={() => window.print()} className="h-8 w-8 flex items-center justify-center cursor-pointer hover:bg-elevated rounded-lg transition-colors" aria-label="Imprimir cifra">
           <Printer className="w-4 h-4 text-muted" />
         </button>
+        {onStageMode && (
+          <button
+            onClick={onStageMode}
+            className="h-8 w-8 flex items-center justify-center cursor-pointer hover:bg-elevated rounded-lg transition-colors text-muted"
+            aria-label="Modo palco"
+            title="Modo palco (tela cheia)"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Mantém montado enquanto aberto; fechar o painel desliga o som. */}
@@ -300,6 +448,20 @@ export function ChordToolbar({
               ))}
             </div>
           </div>
+
+          {/* Acordes simplificados */}
+          <label className="flex items-center justify-between gap-3 cursor-pointer">
+            <span>
+              <span className="block text-[11px] font-bold uppercase tracking-wider text-muted">Acordes simplificados</span>
+              <span className="block text-[10px] text-subtle">Para iniciantes: A7M(9) vira A, F#m7(11) vira F#m</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={simplify}
+              onChange={(e) => onSimplifyChange(e.target.checked)}
+              className="w-5 h-5 accent-[var(--accent)] cursor-pointer shrink-0"
+            />
+          </label>
 
           {/* Cor da cifra */}
           <div>

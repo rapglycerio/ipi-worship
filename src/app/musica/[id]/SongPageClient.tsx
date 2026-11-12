@@ -8,6 +8,7 @@ import ChordBlockView, { ChordToolbar, CHORD_COLORS, MAX_CAPO, transposeKey } fr
 import BlockEditor from '@/components/BlockEditor';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import { TIME_SIGNATURES } from '@/components/Metronome';
+import ChordDiagram from '@/components/ChordDiagram';
 import type { MasterSong, ViewMode, FontSizePreset, LiturgicalTag, SongNature, Playlist, ChordBlock } from '@/types';
 import {
   ArrowLeft,
@@ -43,6 +44,7 @@ import {
   Lock,
   Archive,
   ArchiveRestore,
+  Minimize2,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -72,7 +74,11 @@ const SPEED_LEVELS = [8, 18, 32, 52, 80];
 const MIN_SPEED = 0;
 const MAX_SPEED = SPEED_LEVELS.length - 1;
 
-function AutoScroller() {
+/**
+ * Rolagem automática. Sem `scrollEl` rola a página; no modo palco rola o
+ * container da tela cheia. `stage` posiciona a barra sem a tab bar embaixo.
+ */
+function AutoScroller({ scrollEl, stage = false }: { scrollEl?: HTMLElement | null; stage?: boolean } = {}) {
   const [playing, setPlaying] = useState(false);
   const [speedIdx, setSpeedIdx] = useState(2); // default: middle
 
@@ -106,11 +112,14 @@ function AutoScroller() {
       accRef.current += pxPerSec * dt;
       const whole = Math.floor(accRef.current);
       if (whole >= 1) {
-        window.scrollBy({ top: whole, behavior: 'instant' });
+        if (scrollEl) scrollEl.scrollBy({ top: whole, behavior: 'instant' });
+        else window.scrollBy({ top: whole, behavior: 'instant' });
         accRef.current -= whole;
       }
-      // Chegou ao fim da página: para sozinho.
-      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      // Chegou ao fim: para sozinho.
+      const atBottom = scrollEl
+        ? scrollEl.clientHeight + scrollEl.scrollTop >= scrollEl.scrollHeight - 2
+        : window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
       if (atBottom) {
         setPlaying(false);
         return;
@@ -129,12 +138,12 @@ function AutoScroller() {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       window.removeEventListener('pointerdown', pauseOnTouch);
     };
-  }, [playing, speedIdx]);
+  }, [playing, speedIdx, scrollEl]);
 
   return (
     <div
       ref={barRef}
-      className="autoscroll-bar fixed z-30 no-print flex items-center gap-2 bg-card/95 backdrop-blur-sm border border-border rounded-full shadow-lg px-2 py-1.5"
+      className={`${stage ? 'autoscroll-bar autoscroll-bar--stage z-[65]' : 'autoscroll-bar z-30'} fixed no-print flex items-center gap-2 bg-card/95 backdrop-blur-sm border border-border rounded-full shadow-lg px-2 py-1.5`}
     >
       {/* Diminuir velocidade */}
       <button
@@ -177,6 +186,140 @@ function AutoScroller() {
         </div>
         <Gauge className="w-3 h-3 text-subtle" />
       </div>
+    </div>
+  );
+}
+
+// ── Modo palco ────────────────────────────────────────────────
+
+const STAGE_FONT_SIZES: FontSizePreset[] = ['md', 'lg', 'xl', '2xl'];
+
+interface StageViewProps {
+  title: string;
+  keyLabel: string;
+  blocks: ChordBlock[];
+  viewMode: ViewMode;
+  transposeSemitones: number;
+  simplify: boolean;
+  chordColor: string | null;
+  prevHref?: string;
+  nextHref?: string;
+  onChordClick: (chord: string) => void;
+  onExit: () => void;
+}
+
+/** Tela cheia só com a cifra: letra grande, sem menus, rolagem automática e tela sempre ligada. */
+function StageView({
+  title, keyLabel, blocks, viewMode, transposeSemitones, simplify, chordColor,
+  prevHref, nextHref, onChordClick, onExit,
+}: StageViewProps) {
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+  const [fontSize, setFontSize] = useState<FontSizePreset>(() => {
+    try {
+      const saved = localStorage.getItem('worship_stageFontSize') as FontSizePreset | null;
+      if (saved && STAGE_FONT_SIZES.includes(saved)) return saved;
+    } catch { /* storage indisponível */ }
+    return 'xl';
+  });
+  const fontIdx = STAGE_FONT_SIZES.indexOf(fontSize);
+  const changeFont = (delta: number) => {
+    const next = STAGE_FONT_SIZES[Math.min(STAGE_FONT_SIZES.length - 1, Math.max(0, fontIdx + delta))];
+    setFontSize(next);
+    try { localStorage.setItem('worship_stageFontSize', next); } catch { /* storage indisponível */ }
+  };
+
+  // Tela cheia de verdade quando o navegador permite (iPhone não permite: fica a sobreposição).
+  // Também trava a rolagem da página de trás e mantém a tela ligada.
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const el = document.documentElement;
+    let enteredFullscreen = false;
+    if (el.requestFullscreen && !document.fullscreenElement) {
+      el.requestFullscreen().then(() => { enteredFullscreen = true; }).catch(() => {});
+    }
+    let lock: WakeLockSentinel | null = null;
+    navigator.wakeLock?.request('screen').then((l) => { lock = l; }).catch(() => {});
+
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onExit(); };
+    // Saiu da tela cheia pelo sistema (gesto/Esc): sai do modo palco junto.
+    const onFsChange = () => { if (enteredFullscreen && !document.fullscreenElement) onExit(); };
+    window.addEventListener('keydown', onKey);
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('fullscreenchange', onFsChange);
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      lock?.release().catch(() => {});
+    };
+  }, [onExit]);
+
+  return (
+    <div
+      ref={setScrollEl}
+      className="fixed inset-0 z-[60] bg-background overflow-y-auto no-print"
+      style={chordColor ? ({ '--chord-color': chordColor } as CSSProperties) : undefined}
+      role="dialog"
+      aria-label={`Modo palco: ${title}`}
+    >
+      {/* Barra mínima */}
+      <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-2 bg-background/90 backdrop-blur border-b border-border"
+        style={{ paddingTop: 'calc(0.5rem + env(safe-area-inset-top))' }}>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-foreground truncate">{title}</p>
+          <p className="text-[11px] font-mono font-semibold text-accent truncate">{keyLabel}</p>
+        </div>
+        <div className="flex items-center bg-elevated rounded-lg shrink-0">
+          <button onClick={() => changeFont(-1)} disabled={fontIdx === 0}
+            className="h-10 w-10 flex items-center justify-center text-muted disabled:opacity-30 cursor-pointer"
+            aria-label="Diminuir letra">
+            <span className="text-xs font-bold">A−</span>
+          </button>
+          <button onClick={() => changeFont(1)} disabled={fontIdx === STAGE_FONT_SIZES.length - 1}
+            className="h-10 w-10 flex items-center justify-center text-muted disabled:opacity-30 cursor-pointer"
+            aria-label="Aumentar letra">
+            <span className="text-base font-bold">A+</span>
+          </button>
+        </div>
+        <button onClick={onExit}
+          className="h-10 px-3 rounded-lg bg-elevated text-foreground text-xs font-semibold flex items-center gap-1.5 cursor-pointer hover:bg-border shrink-0"
+          aria-label="Sair do modo palco">
+          <Minimize2 className="w-4 h-4" />
+          <span className="hidden sm:inline">Sair</span>
+        </button>
+      </div>
+
+      <div className="px-4 md:px-10 py-5 pb-40 max-w-5xl mx-auto">
+        {blocks.map((block) => (
+          <ChordBlockView
+            key={block.id}
+            block={block}
+            viewMode={viewMode}
+            fontSize={fontSize}
+            transposeSemitones={transposeSemitones}
+            simplify={simplify}
+            onChordClick={onChordClick}
+          />
+        ))}
+
+        {(prevHref || nextHref) && (
+          <div className="flex items-center gap-3 mt-6">
+            {prevHref ? (
+              <Link href={`${prevHref}&palco=1`} className="flex-1 flex items-center gap-2 px-4 py-4 rounded-xl bg-elevated text-foreground cursor-pointer">
+                <ChevronLeft className="w-5 h-5 text-accent" /><span className="text-sm font-semibold">Anterior</span>
+              </Link>
+            ) : <div className="flex-1" />}
+            {nextHref ? (
+              <Link href={`${nextHref}&palco=1`} className="flex-1 flex items-center justify-end gap-2 px-4 py-4 rounded-xl bg-accent text-white cursor-pointer">
+                <span className="text-sm font-semibold">Próxima</span><ChevronRight className="w-5 h-5" />
+              </Link>
+            ) : <div className="flex-1" />}
+          </div>
+        )}
+      </div>
+
+      <AutoScroller scrollEl={scrollEl} stage />
     </div>
   );
 }
@@ -808,6 +951,18 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
   const [transposeSemitones, setTransposeSemitones] = useState(0);
   const [capo, setCapo] = useState(0);
   const [chordColor, setChordColor] = useState<string | null>(null);
+  const [simplify, setSimplify] = useState(false);
+  const [stageMode, setStageMode] = useState(() => searchParams.get('palco') === '1');
+  const [diagramChord, setDiagramChord] = useState<string | null>(null);
+  const exitStage = useCallback(() => {
+    setStageMode(false);
+    // Tira o ?palco=1 da URL sem recarregar, para um F5 não reabrir o palco.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('palco')) {
+      url.searchParams.delete('palco');
+      window.history.replaceState(window.history.state, '', url.toString());
+    }
+  }, []);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
@@ -859,6 +1014,7 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
     try {
       const savedColor = localStorage.getItem('worship_chordColor');
       if (savedColor && CHORD_COLORS.some((c) => c.value === savedColor)) setChordColor(savedColor);
+      if (localStorage.getItem('worship_simplifyChords') === '1') setSimplify(true);
     } catch { /* storage indisponível */ }
   }, []);
 
@@ -984,6 +1140,14 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
     } catch { /* storage indisponível */ }
   };
 
+  const handleSimplifyChange = (on: boolean) => {
+    setSimplify(on);
+    try {
+      if (on) localStorage.setItem('worship_simplifyChords', '1');
+      else localStorage.removeItem('worship_simplifyChords');
+    } catch { /* storage indisponível */ }
+  };
+
   const handleChordColorChange = (color: string | null) => {
     setChordColor(color);
     try {
@@ -1081,8 +1245,30 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
       className="min-h-screen pb-44 md:pb-28"
       style={chordColor ? ({ '--chord-color': chordColor } as CSSProperties) : undefined}
     >
-      {/* Auto-scroll widget */}
-      <AutoScroller />
+      {/* Auto-scroll widget (no palco, a tela cheia tem a sua própria) */}
+      {!stageMode && <AutoScroller />}
+
+      {stageMode && (
+        <StageView
+          title={song.title}
+          keyLabel={
+            `Tom: ${transposeKey(activeVersion.key, transposeSemitones)}` +
+            (capo > 0 ? ` · Capo ${capo}ª (formas em ${transposeKey(activeVersion.key, transposeSemitones - capo)})` : '') +
+            (activeVersion.bpm ? ` · ${activeVersion.bpm} BPM` : '')
+          }
+          blocks={activeVersion.blocks}
+          viewMode={viewMode}
+          transposeSemitones={transposeSemitones - capo}
+          simplify={simplify}
+          chordColor={chordColor}
+          prevHref={prevArr ? plHref(prevArr.masterSongId) : undefined}
+          nextHref={nextArr ? plHref(nextArr.masterSongId) : undefined}
+          onChordClick={setDiagramChord}
+          onExit={exitStage}
+        />
+      )}
+
+      {diagramChord && <ChordDiagram symbol={diagramChord} onClose={() => setDiagramChord(null)} />}
 
       {/* Modals */}
       {showAddToPlaylist && (
@@ -1552,11 +1738,14 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
         transposeSemitones={transposeSemitones}
         capo={capo}
         chordColor={chordColor}
+        simplify={simplify}
         onViewModeChange={handleViewModeChange}
         onFontSizeChange={handleFontSizeChange}
         onTransposeChange={setTransposeSemitones}
         onCapoChange={handleCapoChange}
         onChordColorChange={handleChordColorChange}
+        onSimplifyChange={handleSimplifyChange}
+        onStageMode={() => setStageMode(true)}
       />
 
       {/* Blocks — com capo, mostra as formas (tom que soa − casa do capo) */}
@@ -1568,6 +1757,8 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
             viewMode={viewMode}
             fontSize={fontSize}
             transposeSemitones={transposeSemitones - capo}
+            simplify={simplify}
+            onChordClick={setDiagramChord}
           />
         ))}
       </div>
