@@ -1,10 +1,22 @@
 'use client';
 
+import { useState, type FormEvent } from 'react';
 import { signIn, useSession } from 'next-auth/react';
-import { Music } from 'lucide-react';
+import { Music, Loader2, Mail, Lock, User } from 'lucide-react';
+
+type Mode = 'login' | 'register';
+
+const inputClass =
+  'w-full pl-9 pr-3 py-2.5 bg-elevated border border-border rounded-lg text-sm text-foreground placeholder:text-subtle focus:outline-none focus:border-accent/50';
 
 export default function LoginPage() {
   const { data: session, status } = useSession();
+  const [mode, setMode] = useState<Mode>('login');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   if (status === 'loading') {
     return (
@@ -20,8 +32,44 @@ export default function LoginPage() {
     return null;
   }
 
+  const switchMode = (m: Mode) => {
+    setMode(m);
+    setError(null);
+  };
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (mode === 'register') {
+        const res = await fetch('/api/account/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(json?.error || 'Não foi possível criar a conta.');
+          return;
+        }
+      }
+      const result = await signIn('credentials', { email, password, redirect: false });
+      if (!result || result.error) {
+        setError('E-mail ou senha incorretos.');
+        return;
+      }
+      window.location.href = '/';
+    } catch {
+      setError('Erro de conexão. Tente novamente.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center px-5">
+    <div className="min-h-screen flex items-center justify-center px-5 py-10">
       <div className="w-full max-w-sm animate-fade-in">
         {/* Brand */}
         <div className="text-center mb-8">
@@ -36,16 +84,95 @@ export default function LoginPage() {
 
         {/* Login Card */}
         <div className="bg-card border border-border rounded-2xl p-6">
-          <h2 className="text-base font-semibold text-foreground text-center mb-1">
-            Entrar com Google
-          </h2>
-          <p className="text-xs text-muted text-center mb-6">
-            Use sua conta Google para acessar o sistema de louvor.
-          </p>
+          {/* Entrar / Criar conta */}
+          <div className="grid grid-cols-2 gap-1 p-1 bg-elevated rounded-xl mb-5" role="tablist">
+            {(['login', 'register'] as const).map((m) => (
+              <button
+                key={m}
+                role="tab"
+                aria-selected={mode === m}
+                onClick={() => switchMode(m)}
+                className={`py-2 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                  mode === m ? 'bg-accent text-white shadow-sm' : 'text-muted hover:text-foreground'
+                }`}
+              >
+                {m === 'login' ? 'Entrar' : 'Criar conta'}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-3">
+            {mode === 'register' && (
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Seu nome"
+                  autoComplete="name"
+                  required
+                  className={inputClass}
+                />
+              </div>
+            )}
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="E-mail"
+                autoComplete="email"
+                required
+                className={inputClass}
+              />
+            </div>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={mode === 'register' ? 'Senha (mín. 8 caracteres)' : 'Senha'}
+                autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                minLength={mode === 'register' ? 8 : undefined}
+                required
+                className={inputClass}
+              />
+            </div>
+
+            {error && (
+              <p className="text-xs text-danger bg-danger/10 rounded-lg px-3 py-2" role="alert">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full py-3 rounded-xl bg-accent text-white font-semibold text-sm hover:bg-accent/90 disabled:opacity-50 cursor-pointer transition-all flex items-center justify-center gap-2"
+            >
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+              {mode === 'login' ? 'Entrar' : 'Criar conta'}
+            </button>
+
+            {mode === 'login' && (
+              <p className="text-[11px] text-subtle text-center">
+                Esqueceu a senha? Peça ao administrador para redefinir.
+              </p>
+            )}
+          </form>
+
+          <div className="flex items-center gap-3 my-5">
+            <span className="flex-1 h-px bg-border" />
+            <span className="text-[10px] uppercase tracking-wider text-subtle">ou</span>
+            <span className="flex-1 h-px bg-border" />
+          </div>
 
           <button
             onClick={() => signIn('google', { callbackUrl: '/' })}
-            className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white text-gray-800 font-semibold text-sm hover:bg-gray-100 transition-all cursor-pointer shadow-sm"
+            className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white text-gray-800 font-semibold text-sm hover:bg-gray-100 transition-all cursor-pointer shadow-sm border border-border"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path

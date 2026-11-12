@@ -1,7 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import type { ChordBlock, ViewMode, FontSizePreset, StageDirectionItem } from '@/types';
+import Metronome from '@/components/Metronome';
 import {
+  Check,
+  SlidersHorizontal,
+  Timer,
   Eye,
   EyeOff,
   Type,
@@ -160,16 +165,34 @@ export default function ChordBlockView({ block, viewMode, fontSize, transposeSem
 
 // ── ChordToolbar ─────────────────────────────────────────────
 
+/** Cores de cifra escolhíveis (preferência do aparelho). `null` = cor padrão do app. */
+export const CHORD_COLORS: { value: string | null; label: string; swatch: string }[] = [
+  { value: null, label: 'Azul (padrão)', swatch: 'var(--accent)' },
+  { value: '#f97316', label: 'Laranja', swatch: '#f97316' },
+  { value: '#16a34a', label: 'Verde', swatch: '#16a34a' },
+  { value: '#ef4444', label: 'Vermelho', swatch: '#ef4444' },
+  { value: '#a855f7', label: 'Roxo', swatch: '#a855f7' },
+  { value: '#ec4899', label: 'Rosa', swatch: '#ec4899' },
+  { value: 'var(--foreground)', label: 'Igual à letra', swatch: 'var(--foreground)' },
+];
+
+export const MAX_CAPO = 7;
+
 interface ChordToolbarProps {
   songTitle: string;
   currentKey: string;
   bpm: number;
+  timeSignature?: string;
   viewMode: ViewMode;
   fontSize: FontSizePreset;
   transposeSemitones: number;
+  capo: number;
+  chordColor: string | null;
   onViewModeChange: (mode: ViewMode) => void;
   onFontSizeChange: (size: FontSizePreset) => void;
   onTransposeChange: (semitones: number) => void;
+  onCapoChange: (capo: number) => void;
+  onChordColorChange: (color: string | null) => void;
 }
 
 const fontSizes: FontSizePreset[] = ['sm', 'md', 'lg', 'xl', '2xl'];
@@ -178,14 +201,23 @@ export function ChordToolbar({
   songTitle,
   currentKey,
   bpm,
+  timeSignature,
   viewMode,
   fontSize,
   transposeSemitones,
+  capo,
+  chordColor,
   onViewModeChange,
   onFontSizeChange,
   onTransposeChange,
+  onCapoChange,
+  onChordColorChange,
 }: ChordToolbarProps) {
+  const [showOptions, setShowOptions] = useState(false);
+  const [showMetronome, setShowMetronome] = useState(false);
   const transposedKey = transposeKey(currentKey, transposeSemitones);
+  // Com capotraste, o violonista lê as "formas" um tom abaixo do que soa.
+  const shapeKey = transposeKey(currentKey, transposeSemitones - capo);
   const currentFontIndex = fontSizes.indexOf(fontSize);
   const isLyricsOnly = viewMode === 'lyrics_only';
 
@@ -199,18 +231,102 @@ export function ChordToolbar({
       <div className="flex items-center justify-between mb-2">
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold text-foreground truncate">{songTitle}</h2>
-          <div className="flex items-center gap-3 mt-0.5">
+          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
             <span className="text-[11px] font-mono font-semibold text-accent">
               Tom: {transposedKey}
               {deltaLabel && <span className="text-subtle ml-1">({deltaLabel})</span>}
             </span>
-            <span className="text-[11px] font-mono text-muted">{bpm} BPM</span>
+            {capo > 0 && (
+              <span className="text-[11px] font-mono font-semibold text-warning">
+                Capo {capo}ª · formas em {shapeKey}
+              </span>
+            )}
+            {bpm > 0 && <span className="text-[11px] font-mono text-muted">{bpm} BPM</span>}
+            {timeSignature && <span className="text-[11px] font-mono text-muted">{timeSignature}</span>}
           </div>
         </div>
+        <button
+          onClick={() => setShowMetronome((v) => !v)}
+          className={`h-8 w-8 flex items-center justify-center cursor-pointer rounded-lg transition-colors ${showMetronome ? 'bg-accent/15 text-accent' : 'hover:bg-elevated text-muted'}`}
+          aria-label="Metrônomo"
+          aria-expanded={showMetronome}
+          title="Metrônomo"
+        >
+          <Timer className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => setShowOptions((v) => !v)}
+          className={`h-8 w-8 flex items-center justify-center cursor-pointer rounded-lg transition-colors ${showOptions ? 'bg-accent/15 text-accent' : 'hover:bg-elevated text-muted'}`}
+          aria-label="Capotraste e cor da cifra"
+          aria-expanded={showOptions}
+          title="Capotraste e cor da cifra"
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+        </button>
         <button onClick={() => window.print()} className="h-8 w-8 flex items-center justify-center cursor-pointer hover:bg-elevated rounded-lg transition-colors" aria-label="Imprimir cifra">
           <Printer className="w-4 h-4 text-muted" />
         </button>
       </div>
+
+      {/* Mantém montado enquanto aberto; fechar o painel desliga o som. */}
+      {showMetronome && (
+        <div className="mb-2 p-2.5 rounded-xl bg-elevated/80 border border-border animate-fade-in">
+          <Metronome bpm={bpm} timeSignature={timeSignature} />
+        </div>
+      )}
+
+      {showOptions && (
+        <div className="mb-2 p-3 rounded-xl bg-elevated/80 border border-border space-y-3 animate-fade-in">
+          {/* Capotraste */}
+          <div>
+            <div className="flex items-baseline justify-between mb-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Capotraste</span>
+              <span className="text-[10px] text-subtle">
+                {capo > 0 ? `soa em ${transposedKey}, toque as formas de ${shapeKey}` : 'sem capo'}
+              </span>
+            </div>
+            <div className="flex gap-1 overflow-x-auto pb-0.5">
+              {Array.from({ length: MAX_CAPO + 1 }, (_, n) => (
+                <button
+                  key={n}
+                  onClick={() => onCapoChange(n)}
+                  className={`h-9 min-w-9 px-2 rounded-lg text-xs font-bold cursor-pointer transition-colors shrink-0 ${
+                    n === capo ? 'bg-accent text-white' : 'bg-card text-foreground hover:bg-border'
+                  }`}
+                  aria-pressed={n === capo}
+                >
+                  {n === 0 ? 'Sem' : `${n}ª`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Cor da cifra */}
+          <div>
+            <span className="block text-[11px] font-bold uppercase tracking-wider text-muted mb-1.5">Cor da cifra</span>
+            <div className="flex gap-2 flex-wrap">
+              {CHORD_COLORS.map((c) => {
+                const selected = c.value === chordColor;
+                return (
+                  <button
+                    key={c.label}
+                    onClick={() => onChordColorChange(c.value)}
+                    className={`w-9 h-9 rounded-full cursor-pointer border-2 transition-transform flex items-center justify-center ${
+                      selected ? 'border-foreground scale-110' : 'border-transparent hover:scale-105'
+                    }`}
+                    style={{ background: c.swatch }}
+                    aria-label={c.label}
+                    aria-pressed={selected}
+                    title={c.label}
+                  >
+                    {selected && <Check className="w-4 h-4 text-white mix-blend-difference" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-1.5">
         {/* Transpose — shows transposed key directly */}

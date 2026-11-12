@@ -70,6 +70,61 @@ export async function getPrivatePlaylistsForOwner(email: string): Promise<unknow
   return data ?? [];
 }
 
+// === Login por e-mail e senha (tabela user_credentials, só service_role) ===
+
+export async function getPasswordHash(email: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from('user_credentials')
+    .select('password_hash')
+    .eq('email', email)
+    .maybeSingle();
+  if (error) { console.error('getPasswordHash:', error); return null; }
+  return data?.password_hash ?? null;
+}
+
+export async function setPasswordHash(email: string, passwordHash: string): Promise<boolean> {
+  const { error } = await supabaseAdmin
+    .from('user_credentials')
+    .upsert(
+      { email, password_hash: passwordHash, updated_at: new Date().toISOString() },
+      { onConflict: 'email' }
+    );
+  if (error) { console.error('setPasswordHash:', error); return false; }
+  return true;
+}
+
+export async function deletePasswordHash(email: string): Promise<void> {
+  const { error } = await supabaseAdmin.from('user_credentials').delete().eq('email', email);
+  if (error) console.error('deletePasswordHash:', error);
+}
+
+export async function getAppUserByEmail(
+  email: string
+): Promise<{ id: string; email: string; display_name: string | null; photo_url: string | null } | null> {
+  const { data, error } = await supabaseAdmin
+    .from('app_users')
+    .select('id, email, display_name, photo_url')
+    .eq('email', email)
+    .maybeSingle();
+  if (error) { console.error('getAppUserByEmail:', error); return null; }
+  return data;
+}
+
+export async function getAppUserEmailById(id: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin.from('app_users').select('email').eq('id', id).maybeSingle();
+  if (error) { console.error('getAppUserEmailById:', error); return null; }
+  return data?.email ?? null;
+}
+
+/** Cria o usuário (papel padrão do banco: visitor). Falha se o e-mail já existe. */
+export async function createAppUser(email: string, displayName: string): Promise<boolean> {
+  const { error } = await supabaseAdmin
+    .from('app_users')
+    .insert({ email, display_name: displayName, last_seen: new Date().toISOString() });
+  if (error) { console.error('createAppUser:', error); return false; }
+  return true;
+}
+
 /** app_users é só-leitura pra anon — salvar a preferência exige service_role. */
 export async function setViewModePreference(email: string, viewMode: string): Promise<boolean> {
   const { error } = await supabaseAdmin

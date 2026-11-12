@@ -245,11 +245,11 @@ export default function Sidebar() {
                 </button>
               ) : (
                 <button
-                  onClick={() => { signIn('google'); setShowDrawer(false); }}
+                  onClick={() => { signIn(); setShowDrawer(false); }}
                   className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer font-medium min-h-[44px]"
                 >
                   <LogIn className="w-5 h-5 shrink-0" />
-                  Entrar com Google
+                  Entrar / Criar conta
                 </button>
               )}
             </div>
@@ -402,13 +402,13 @@ export default function Sidebar() {
             </button>
           ) : (
             <button
-              onClick={() => signIn('google')}
-              title={isCollapsed ? 'Entrar com Google' : undefined}
+              onClick={() => signIn()}
+              title={isCollapsed ? 'Entrar / Criar conta' : undefined}
               className={`flex items-center gap-3 w-full rounded-lg text-sm text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer font-medium min-h-[44px]
                 ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}
             >
               <LogIn className="w-[18px] h-[18px] shrink-0" />
-              {!isCollapsed && <span>Entrar com Google</span>}
+              {!isCollapsed && <span>Entrar / Criar conta</span>}
             </button>
           )}
 
@@ -562,11 +562,11 @@ export default function Sidebar() {
                 </button>
               ) : (
                 <button
-                  onClick={() => { signIn('google'); setShowMais(false); }}
+                  onClick={() => { signIn(); setShowMais(false); }}
                   className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer font-medium min-h-[44px]"
                 >
                   <LogIn className="w-5 h-5 shrink-0" />
-                  Entrar com Google
+                  Entrar / Criar conta
                 </button>
               )}
             </div>

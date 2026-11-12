@@ -452,6 +452,8 @@ export async function updateVersionMetadata(
   data: {
     key?: string;
     bpm?: number;
+    /** "" limpa o compasso; undefined não mexe. */
+    timeSignature?: string;
     youtubeUrl?: string;
     artists?: string[];
   }
@@ -459,6 +461,7 @@ export async function updateVersionMetadata(
   const patch: Record<string, unknown> = {};
   if (data.key !== undefined) patch.key = data.key;
   if (data.bpm !== undefined) patch.bpm = data.bpm;
+  if (data.timeSignature !== undefined) patch.time_signature = data.timeSignature || null;
   if (data.youtubeUrl !== undefined) patch.youtube_url = data.youtubeUrl || null;
 
   if (Object.keys(patch).length > 0) {
@@ -590,6 +593,11 @@ export async function setUserAdmin(userId: string, admin: boolean): Promise<bool
   return postOk('/api/admin/set-role', { userId, admin });
 }
 
+/** Admin: define/redefine a senha de login por e-mail de um usuário. */
+export async function setUserPassword(userId: string, password: string): Promise<boolean> {
+  return postOk('/api/admin/set-password', { userId, password });
+}
+
 /** Preferência salva (cifra+letra / só letra) do usuário logado, se houver. */
 export async function fetchUserViewModePreference(email: string): Promise<ViewMode | null> {
   const { data, error } = await supabase
@@ -620,6 +628,7 @@ function mapDbSongToMasterSong(row: any): MasterSong {
       artists: (v.version_artists || []).map((a: any) => a.artist_name),
       key: v.key,
       bpm: v.bpm,
+      timeSignature: v.time_signature || undefined,
       blocks: (v.chord_blocks || [])
         .sort((a: any, b: any) => a.sort_order - b.sort_order)
         .map((b: any): ChordBlock => ({

@@ -10,6 +10,7 @@ import {
   Loader2,
   Clock,
   Mail,
+  KeyRound,
 } from 'lucide-react';
 import type { AppUserRecord } from '@/lib/data';
 
@@ -36,11 +37,31 @@ function UserRow({ user, currentUserId, onToggleAdmin }: UserRowProps) {
   const [loading, setLoading] = useState(false);
   const isSelf = user.id === currentUserId;
 
+  const [settingPassword, setSettingPassword] = useState(false);
+
   async function handleToggle() {
     if (isSelf || loading) return;
     setLoading(true);
     await onToggleAdmin(user.id, !user.isAdmin);
     setLoading(false);
+  }
+
+  // Sem envio de e-mail: o admin define uma senha provisória e passa à pessoa.
+  async function handleSetPassword() {
+    if (settingPassword) return;
+    const password = window.prompt(
+      `Nova senha para ${user.name || user.email} (mín. 8 caracteres).\nPasse a senha para a pessoa — ela entra com o e-mail ${user.email}.`
+    );
+    if (password === null) return;
+    if (password.length < 8) {
+      alert('A senha precisa ter pelo menos 8 caracteres.');
+      return;
+    }
+    setSettingPassword(true);
+    const { setUserPassword } = await import('@/lib/data');
+    const ok = await setUserPassword(user.id, password);
+    setSettingPassword(false);
+    alert(ok ? 'Senha definida.' : 'Não foi possível definir a senha.');
   }
 
   return (
@@ -85,6 +106,17 @@ function UserRow({ user, currentUserId, onToggleAdmin }: UserRowProps) {
           </span>
         </div>
       </div>
+
+      {/* Definir / redefinir senha */}
+      <button
+        onClick={handleSetPassword}
+        disabled={settingPassword}
+        title="Definir senha de login por e-mail"
+        className="shrink-0 h-8 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 bg-elevated text-muted hover:bg-border"
+      >
+        {settingPassword ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <KeyRound className="w-3.5 h-3.5" />}
+        <span className="hidden sm:inline">Senha</span>
+      </button>
 
       {/* Toggle admin */}
       {!isSelf && (

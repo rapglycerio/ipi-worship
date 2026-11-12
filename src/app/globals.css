@@ -165,9 +165,25 @@ body {
 .chord-line {
   font-family: var(--font-mono);
   font-weight: 600;
-  color: var(--accent);
+  color: var(--chord-color, var(--accent));
   white-space: pre;
   user-select: text;
+}
+
+/* Barra de rolagem automática: centralizada acima da tab bar no celular,
+   no canto inferior direito no desktop (não há tab bar). */
+.autoscroll-bar {
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(4.75rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 768px) {
+  .autoscroll-bar {
+    left: auto;
+    right: 1.5rem;
+    transform: none;
+    bottom: 1.5rem;
+  }
 }
 
 .lyric-line {
