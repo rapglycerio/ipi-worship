@@ -112,7 +112,10 @@ function AutoScroller({ scrollEl, stage = false }: { scrollEl?: HTMLElement | nu
       accRef.current += pxPerSec * dt;
       const whole = Math.floor(accRef.current);
       if (whole >= 1) {
-        if (scrollEl) scrollEl.scrollBy({ top: whole, behavior: 'instant' });
+        // No palco rola o container direto pelo scrollTop (sem opções de comportamento,
+        // que variam entre navegadores); na página usa 'instant' para ignorar o
+        // scroll-behavior: smooth do <html>.
+        if (scrollEl) scrollEl.scrollTop += whole;
         else window.scrollBy({ top: whole, behavior: 'instant' });
         accRef.current -= whole;
       }
@@ -128,15 +131,19 @@ function AutoScroller({ scrollEl, stage = false }: { scrollEl?: HTMLElement | nu
     }
     rafRef.current = requestAnimationFrame(step);
 
-    // Tocar na tela (fora da barra) pausa — o músico retoma quando quiser.
-    const pauseOnTouch = (e: Event) => {
+    // Pausa só quando o músico ROLA com o dedo/roda do mouse — não com um toque
+    // parado. No palco a cifra ocupa a tela toda e o dedo que segura o celular
+    // encostava na borda, pausando a rolagem logo depois do play.
+    const pauseOnManualScroll = (e: Event) => {
       if (barRef.current?.contains(e.target as Node)) return;
       setPlaying(false);
     };
-    window.addEventListener('pointerdown', pauseOnTouch);
+    window.addEventListener('touchmove', pauseOnManualScroll, { passive: true });
+    window.addEventListener('wheel', pauseOnManualScroll, { passive: true });
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      window.removeEventListener('pointerdown', pauseOnTouch);
+      window.removeEventListener('touchmove', pauseOnManualScroll);
+      window.removeEventListener('wheel', pauseOnManualScroll);
     };
   }, [playing, speedIdx, scrollEl]);
 
