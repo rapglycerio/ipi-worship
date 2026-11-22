@@ -106,13 +106,27 @@ function AutoScroller({ scrollEl, stage = false }: { scrollEl?: HTMLElement | nu
     const pxPerSec = SPEED_LEVELS[speedIdx];
     lastRef.current = performance.now();
 
+    // Enquanto o músico rola com o dedo/roda do mouse, a rolagem automática só
+    // "segura" (não briga com o dedo nem com a inércia) e depois continua de onde
+    // ele deixou — normalmente ele só pulou para outra parte da música.
+    let touching = 0;
+    let holdUntil = 0;
+
     function step(now: number) {
       const dt = (now - lastRef.current) / 1000;
       lastRef.current = now;
+      if (touching > 0 || now < holdUntil) {
+        accRef.current = 0;
+        rafRef.current = requestAnimationFrame(step);
+        return;
+      }
       accRef.current += pxPerSec * dt;
       const whole = Math.floor(accRef.current);
       if (whole >= 1) {
-        if (scrollEl) scrollEl.scrollBy({ top: whole, behavior: 'instant' });
+        // No palco rola o container direto pelo scrollTop (sem opções de comportamento,
+        // que variam entre navegadores); na página usa 'instant' para ignorar o
+        // scroll-behavior: smooth do <html>.
+        if (scrollEl) scrollEl.scrollTop += whole;
         else window.scrollBy({ top: whole, behavior: 'instant' });
         accRef.current -= whole;
       }
@@ -128,15 +142,30 @@ function AutoScroller({ scrollEl, stage = false }: { scrollEl?: HTMLElement | nu
     }
     rafRef.current = requestAnimationFrame(step);
 
-    // Tocar na tela (fora da barra) pausa — o músico retoma quando quiser.
-    const pauseOnTouch = (e: Event) => {
-      if (barRef.current?.contains(e.target as Node)) return;
-      setPlaying(false);
+    const fromBar = (e: Event) => !!barRef.current?.contains(e.target as Node);
+    const onTouchStart = (e: TouchEvent) => {
+      if (fromBar(e)) return;
+      touching = e.touches.length;
     };
-    window.addEventListener('pointerdown', pauseOnTouch);
+    const onTouchEnd = (e: TouchEvent) => {
+      touching = e.touches.length;
+      // Espera a inércia do deslize acabar antes de voltar a rolar.
+      if (touching === 0) holdUntil = performance.now() + 800;
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (fromBar(e)) return;
+      holdUntil = performance.now() + 500;
+    };
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchend', onTouchEnd, { passive: true });
+    window.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    window.addEventListener('wheel', onWheel, { passive: true });
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      window.removeEventListener('pointerdown', pauseOnTouch);
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchend', onTouchEnd);
+      window.removeEventListener('touchcancel', onTouchEnd);
+      window.removeEventListener('wheel', onWheel);
     };
   }, [playing, speedIdx, scrollEl]);
 
